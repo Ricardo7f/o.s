@@ -1,0 +1,1887 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Painel de OS — Pastas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --bg:#EEF2F0;
+    --surface:#FFFFFF;
+    --ink:#12312D;
+    --ink-soft:#4E645F;
+    --ink-faint:#8AA39C;
+    --primary:#0E5C56;
+    --primary-dark:#0A423E;
+    --primary-soft:#E4F0EC;
+    --accent:#E8A33D;
+    --line:#DCE6E2;
+    --atrasado:#C1443B;
+    --atrasado-soft:#FBE7E5;
+    --hoje:#E8A33D;
+    --um-dia:#4C8FBD;
+    --no-prazo:#3E8F62;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-tap-highlight-color:transparent;
+    padding-bottom:40px;
+  }
+  h1,h2,h3,.num{font-family:'Barlow Condensed',system-ui,sans-serif;}
+
+  header{
+    background:var(--primary);
+    color:#fff;
+    padding:18px 18px 20px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  header .top-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+  header h1{margin:0;font-size:26px;font-weight:700;letter-spacing:0.3px;line-height:1;}
+  header p{margin:4px 0 0;font-size:12.5px;color:#CFE4E0;}
+  .header-actions{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;}
+  .btn-pill{
+    background:rgba(255,255,255,0.14);
+    border:1px solid rgba(255,255,255,0.3);
+    color:#fff;
+    font-size:12px;
+    padding:7px 12px;
+    border-radius:20px;
+    font-weight:600;
+    cursor:pointer;
+    white-space:nowrap;
+    font-family:inherit;
+  }
+  .btn-pill.accent{background:var(--accent);border-color:var(--accent);color:#3A2604;}
+  input[type=file]{display:none;}
+  .status-bar{
+    margin-top:12px;
+    background:rgba(255,255,255,0.10);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:12px;
+    padding:9px 12px;
+    font-size:12.5px;
+    color:#DCEEE9;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .status-dot{width:7px;height:7px;border-radius:50%;background:#8AA39C;flex-shrink:0;}
+  .status-dot.ok{background:#7BD79A;}
+  .status-dot.loading{background:var(--accent);animation:pulse 1.1s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
+  #errorBox{
+    display:none;background:#FBE7E5;border:1px solid #E7B4AE;color:#8A241C;
+    padding:10px 13px;border-radius:12px;font-size:12.5px;margin-top:10px;text-align:left;
+  }
+
+  main{padding:16px 14px 0;max-width:640px;margin:0 auto;}
+
+  /* ---- Painel / cards genéricos ---- */
+  .panel{
+    background:var(--surface);
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 1px 3px rgba(18,49,45,0.06);
+    margin-bottom:14px;
+  }
+  .panel h2{font-size:14.5px;font-weight:700;margin:0 0 4px;font-family:'Inter',sans-serif;color:var(--ink);}
+  .panel .hint{font-size:12.5px;color:var(--ink-soft);margin:0 0 14px;line-height:1.5;}
+
+  /* ---- Biblioteca de pastas ---- */
+  .lib-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+  .lib-breadcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:1px;font-size:13px;min-width:0;}
+  .lib-crumb{
+    background:none;border:none;border-radius:8px;padding:5px 7px;color:var(--ink-faint);
+    font-family:inherit;font-weight:600;cursor:pointer;max-width:170px;overflow:hidden;
+    text-overflow:ellipsis;white-space:nowrap;
+  }
+  .lib-crumb:hover{color:var(--ink-soft);background:var(--primary-soft);}
+  .lib-crumb.current{color:var(--ink);cursor:default;}
+  .lib-crumb.current:hover{background:none;}
+  .lib-crumb.drag-over{background:var(--primary-soft);outline:1px solid var(--primary);color:var(--primary);}
+  .lib-crumb-sep{color:var(--ink-faint);font-size:11px;padding:0 1px;}
+
+  .mini-btn{
+    border:1px solid var(--line);background:var(--surface);color:var(--ink);
+    font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:100px;
+    cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;
+  }
+  .mini-btn:hover{background:var(--primary-soft);}
+  .mini-btn.danger:hover{background:var(--atrasado-soft);border-color:#E7B4AE;color:var(--atrasado);}
+  .mini-btn:disabled{opacity:0.5;cursor:not-allowed;}
+  .mini-btn.dark{background:var(--primary);color:#fff;border-color:var(--primary);}
+  .mini-btn.dark:hover{background:var(--primary-dark);}
+
+  .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px;}
+  .lib-card{
+    position:relative;display:flex;align-items:flex-start;gap:9px;border:1px solid var(--line);
+    border-radius:14px;background:var(--surface);padding:11px 12px;cursor:pointer;
+  }
+  .lib-card:active{transform:scale(0.98);}
+  .lib-card.drag-over{background:var(--primary-soft);border-color:var(--primary);outline:1px solid var(--primary);}
+  .lib-card.dragging{opacity:0.4;}
+  .lib-card .folder-ico{flex-shrink:0;margin-top:1px;}
+  .lib-card-info{min-width:0;flex:1;}
+  .lib-card-name{font-weight:700;font-size:13px;color:var(--ink);display:block;line-height:1.3;word-break:break-word;}
+  .lib-card-meta{font-size:11px;color:var(--ink-faint);margin-top:3px;}
+  .lib-card-meta.has-os{color:var(--primary);font-weight:700;}
+  .lib-rename-input{
+    font-family:inherit;font-weight:700;font-size:13px;color:var(--ink);border:1px solid var(--primary);
+    border-radius:6px;padding:1px 5px;background:#fff;width:100%;
+  }
+  .lib-card-actions{display:flex;position:absolute;top:6px;right:6px;gap:2px;}
+  .lib-card-actions button{
+    background:rgba(255,255,255,0.95);border:1px solid var(--line);cursor:pointer;color:var(--ink-faint);
+    width:22px;height:22px;font-size:12px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:100px;
+  }
+  .lib-card-actions button.lib-del:active{color:var(--atrasado);background:var(--atrasado-soft);}
+  .lib-empty{font-size:13px;color:var(--ink-faint);padding:18px 2px;text-align:center;}
+
+  /* ---- Painel de critérios de uma pasta-folha ---- */
+  .crit-block{margin-top:16px;padding-top:16px;border-top:1px solid var(--line);}
+  .crit-heading{font-size:11px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:var(--ink-faint);margin:0 0 8px;}
+  .crit-section{margin-bottom:16px;}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .chip{
+    display:inline-flex;align-items:center;font-size:12px;font-weight:600;background:var(--primary-soft);
+    border:1px solid #C7E0D8;color:var(--primary-dark);padding:5px 6px 5px 10px;border-radius:100px;gap:4px;
+  }
+  .chip button{background:none;border:none;color:inherit;cursor:pointer;font-size:13px;padding:0 2px;font-family:inherit;line-height:1;}
+  .chips-empty{font-size:12.5px;color:var(--ink-faint);}
+  .chip-add{display:flex;gap:8px;}
+  .chip-add input{
+    flex:1;border:1px solid var(--line);border-radius:12px;padding:9px 11px;font-size:13px;
+    font-family:inherit;color:var(--ink);background:var(--surface);
+  }
+  .chip-add input:focus{outline:none;border-color:var(--primary);}
+  .crit-count{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .crit-count b{color:var(--primary);}
+  .kw-note{font-size:12px;color:var(--ink-faint);margin:2px 0 8px;line-height:1.5;}
+  .kw-results{margin-top:6px;}
+  .kw-result-list{
+    max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:12px;
+    padding:6px;margin-bottom:10px;background:var(--bg);
+  }
+  .kw-result-item{
+    display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;
+    font-size:13px;cursor:pointer;
+  }
+  .kw-result-item:hover{background:var(--primary-soft);}
+  .kw-result-item input[type=checkbox]{flex-shrink:0;width:16px;height:16px;accent-color:var(--primary);}
+  .kw-result-item span:first-of-type{flex:1;}
+  .kw-result-count{font-size:11.5px;color:var(--ink-faint);white-space:nowrap;}
+  .kw-result-item.kw-added{opacity:0.55;}
+  .kw-result-item.kw-added .kw-result-count{color:var(--no-prazo);}
+  .kw-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .folder-detail-top{display:flex;align-items:center;gap:8px;}
+  .folder-detail-top .mini-btn{flex:1;}
+  .gear-btn{
+    flex-shrink:0;width:36px;height:36px;border-radius:100px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-faint);display:inline-flex;align-items:center;justify-content:center;
+    cursor:pointer;padding:0;
+  }
+  .gear-btn:active{background:var(--primary-soft);color:var(--primary);}
+  .gear-btn.open{background:var(--primary-soft);color:var(--primary);border-color:#C7E0D8;}
+
+  /* ---- Modais ---- */
+  .lib-modal-overlay{position:fixed;inset:0;background:rgba(18,49,45,0.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .lib-modal{background:#fff;border-radius:18px;width:100%;max-width:340px;padding:20px;}
+  .lib-modal-title{font-weight:700;font-size:15px;color:var(--atrasado);margin-bottom:8px;}
+  .lib-modal-title.plain{color:var(--ink);}
+  .lib-modal-text{font-size:13px;color:var(--ink-soft);line-height:1.55;margin:0;}
+  .lib-modal-text:empty{display:none;}
+  .lib-modal-text b{color:var(--ink);font-weight:700;}
+  .lib-modal-input{
+    width:100%;margin-top:12px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;
+    font-family:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);
+  }
+  .lib-modal-input:focus{outline:none;border-color:var(--primary);background:var(--surface);}
+  .lib-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+
+  /* ---- Reaproveitado do painel original ---- */
+  .gauge-card{background:var(--surface);border-radius:18px;padding:16px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 3px rgba(18,49,45,0.06);margin-bottom:14px;}
+  .gauge-card svg{flex-shrink:0;}
+  .gauge-text .num{font-size:34px;font-weight:700;line-height:1;color:var(--atrasado);}
+  .gauge-text .label{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .gauge-text .total{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+
+  .filtro-situacao{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .filtro-situacao-btn{
+    flex:1;min-width:0;padding:9px 6px;border-radius:12px;border:1.5px solid var(--line);
+    background:var(--surface);color:var(--ink-soft);font-size:12px;font-weight:700;
+    font-family:inherit;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;transition:all .12s ease;
+  }
+  .filtro-situacao-btn:active{transform:scale(0.97);}
+  .filtro-situacao-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+
+  input.busca-top{
+    width:100%;margin-top:14px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);
+    background:var(--surface);font-size:14px;font-family:inherit;color:var(--ink);
+  }
+  .grupo-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:20px 4px 8px;}
+  .servico-card{
+    background:var(--surface);border-radius:14px;padding:13px 14px;margin-bottom:9px;display:flex;
+    justify-content:space-between;align-items:center;gap:10px;cursor:pointer;box-shadow:0 1px 2px rgba(18,49,45,0.05);
+    border-left:5px solid var(--line);
+  }
+  .servico-card:active{transform:scale(0.98);}
+  .servico-card.tem-atraso{border-color:var(--atrasado);}
+  .servico-nome{font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3;}
+  .servico-total{font-size:12px;color:var(--ink-soft);margin-top:3px;}
+  .servico-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
+  .pill{font-size:11px;font-weight:700;color:#fff;background:var(--atrasado);padding:3px 9px;border-radius:20px;white-space:nowrap;}
+  .chevron{color:var(--ink-soft);font-size:18px;line-height:1;}
+
+  .detalhe-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .btn-voltar{
+    background:var(--surface);border:1px solid var(--line);color:var(--primary-dark);font-weight:700;
+    font-size:14px;padding:8px 13px;border-radius:10px;cursor:pointer;flex-shrink:0;
+  }
+  .detalhe-titulo{font-size:17px;font-weight:600;color:var(--ink);line-height:1.25;}
+  .detalhe-sub{font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
+  .stat{background:var(--surface);border-radius:14px;padding:12px 14px;border-left:5px solid var(--line);cursor:pointer;transition:transform .1s ease;}
+  .stat.active{outline:2px solid var(--ink);}
+  .stat:active{transform:scale(0.97);}
+  .stat .num{font-size:26px;font-weight:700;line-height:1;}
+  .stat .lbl{font-size:11.5px;color:var(--ink-soft);margin-top:2px;font-weight:600;text-transform:uppercase;letter-spacing:0.3px;}
+  .stat.st-atrasado{border-color:var(--atrasado);}
+  .stat.st-atrasado .num{color:var(--atrasado);}
+  .stat.st-vence-hoje{border-color:var(--hoje);}
+  .stat.st-vence-hoje .num{color:#9C6A17;}
+  .stat.st-vence-1-dia{border-color:var(--um-dia);}
+  .stat.st-vence-1-dia .num{color:var(--um-dia);}
+  .stat.st-no-prazo{border-color:var(--no-prazo);}
+  .stat.st-no-prazo .num{color:var(--no-prazo);}
+
+  .filters{margin-top:12px;display:flex;flex-direction:column;gap:8px;}
+  .filters input,.filters select{
+    width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
+    font-size:14px;font-family:inherit;color:var(--ink);
+  }
+  #resultCount{margin:14px 2px 8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
+
+  .card{background:var(--surface);border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 2px rgba(18,49,45,0.05);border-left:5px solid var(--line);}
+  .card.st-atrasado{border-color:var(--atrasado);}
+  .card.st-vence-hoje{border-color:var(--hoje);}
+  .card.st-vence-1-dia{border-color:var(--um-dia);}
+  .card.st-no-prazo{border-color:var(--no-prazo);}
+  .card-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer;}
+  .card-head .left{min-width:0;}
+  .card-os{font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .card-local{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
+  .badge{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 9px;border-radius:20px;color:#fff;white-space:nowrap;text-align:center;}
+  .badge.st-atrasado{background:var(--atrasado);}
+  .badge.st-vence-hoje{background:var(--hoje);color:#3A2604;}
+  .badge.st-vence-1-dia{background:var(--um-dia);}
+  .badge.st-no-prazo{background:var(--no-prazo);}
+  .card-body{display:none;padding:0 14px 14px;font-size:13px;color:var(--ink-soft);border-top:1px solid var(--line);margin-top:2px;padding-top:10px;}
+  .card-body.open{display:block;}
+  .card-body div{margin-bottom:6px;line-height:1.4;}
+  .card-body b{color:var(--ink);font-weight:600;}
+
+  .empty{text-align:center;padding:32px 20px;color:var(--ink-soft);font-size:13.5px;}
+
+  #viewServicos,#viewDetalhe{display:none;}
+
+  /* ---- Tela de login ---- */
+  #loginScreen{
+    min-height:100vh;display:flex;align-items:center;justify-content:center;
+    background:var(--bg);padding:20px;
+  }
+  .login-box{
+    background:var(--surface);border-radius:18px;padding:28px 24px;width:100%;max-width:340px;
+    box-shadow:0 1px 3px rgba(18,49,45,0.06);
+  }
+  .login-box h1{margin:0 0 4px;font-size:24px;font-weight:700;color:var(--ink);}
+  .login-box .login-sub{font-size:12.5px;color:var(--ink-soft);margin:0 0 20px;line-height:1.5;}
+  .login-field{margin-bottom:14px;}
+  .login-field label{display:block;font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:5px;}
+  .login-field input{
+    width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);
+    background:var(--bg);font-size:14px;font-family:inherit;color:var(--ink);
+  }
+  .login-field input:focus{outline:none;border-color:var(--primary);background:var(--surface);}
+  .login-btn{
+    width:100%;background:var(--primary);color:#fff;border:none;border-radius:12px;
+    padding:12px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:4px;
+  }
+  .login-btn:disabled{opacity:0.6;cursor:not-allowed;}
+  .login-btn:active{background:var(--primary-dark);}
+  .login-error{
+    display:none;background:#FBE7E5;border:1px solid #E7B4AE;color:#8A241C;
+    padding:9px 12px;border-radius:12px;font-size:12.5px;margin-bottom:14px;
+  }
+  .login-error.show{display:block;}
+  .logout-btn{
+    background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.3);color:#fff;
+    font-size:12px;padding:7px 12px;border-radius:20px;font-weight:600;cursor:pointer;
+    white-space:nowrap;font-family:inherit;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== TELA DE LOGIN ===================== -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>Painel de OS</h1>
+    <p class="login-sub">Entre com seu e-mail e senha para acessar o painel.</p>
+    <div class="login-error" id="loginError"></div>
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="loginEmail">E-mail</label>
+        <input type="email" id="loginEmail" autocomplete="username" required>
+      </div>
+      <div class="login-field">
+        <label for="loginSenha">Senha</label>
+        <input type="password" id="loginSenha" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">Entrar</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== APP (visível após login) ===================== -->
+<div id="appShell" style="display:none;">
+
+<header>
+  <div class="top-row">
+    <div>
+      <h1>Painel de OS</h1>
+      <p id="headerSub">Pastas por cidade e serviço</p>
+      <p id="headerRole" style="display:none;margin:4px 0 0;font-size:11px;color:var(--accent);font-weight:700;">Modo visualização — apenas o admin edita as pastas</p>
+    </div>
+    <div class="header-actions">
+      <label class="btn-pill accent" for="fileInput">Enviar planilha</label>
+      <input type="file" id="fileInput" accept=".xlsx,.xls">
+      <button class="btn-pill" id="btnLimpar" style="display:none;">Remover planilha</button>
+      <button class="logout-btn" id="btnLogout">Sair</button>
+    </div>
+  </div>
+  <div class="status-bar">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Nenhuma planilha enviada ainda. Crie suas pastas e depois envie o arquivo.</span>
+  </div>
+  <div id="errorBox"></div>
+</header>
+
+<main>
+
+  <!-- ===================== BIBLIOTECA DE PASTAS ===================== -->
+  <div id="screenLibrary">
+    <div class="panel">
+      <div class="lib-toolbar">
+        <div class="lib-breadcrumb" id="libBreadcrumb"></div>
+        <button class="mini-btn" id="newFolderBtn">+ Nova pasta</button>
+      </div>
+      <div class="lib-grid" id="libGrid"></div>
+
+      <div id="folderDetail" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ===================== VIEW A: serviços da pasta aberta ===================== -->
+  <div id="viewServicos">
+    <div class="detalhe-header">
+      <button class="btn-voltar" id="btnVoltarBiblioteca">‹ Pastas</button>
+      <div>
+        <div class="detalhe-titulo" id="tituloPastaAberta"></div>
+        <p class="detalhe-sub" id="subPastaAberta"></p>
+      </div>
+    </div>
+    <div class="gauge-card">
+      <svg width="86" height="86" viewBox="0 0 86 86" id="gaugeSvg"></svg>
+      <div class="gauge-text">
+        <div class="num" id="pctAtrasado">0%</div>
+        <div class="label">das OS desta pasta estão atrasadas</div>
+        <div class="total" id="totalOs">0 OS no total</div>
+      </div>
+    </div>
+    <div class="filtro-situacao" id="filtroSituacao">
+      <button type="button" class="filtro-situacao-btn" data-situacao="PENDENTE">Pendente</button>
+      <button type="button" class="filtro-situacao-btn" data-situacao="POSTERGADA">Postergada</button>
+      <button type="button" class="filtro-situacao-btn" data-situacao="PROGRAMADO">Programado</button>
+    </div>
+    <input type="text" class="busca-top" id="buscaServico" placeholder="Buscar serviço...">
+    <div id="listaServicos"></div>
+  </div>
+
+  <!-- ===================== VIEW B: detalhe de um serviço ===================== -->
+  <div id="viewDetalhe">
+    <div class="detalhe-header">
+      <button class="btn-voltar" id="btnVoltar">‹ Serviços</button>
+      <div class="detalhe-titulo" id="tituloServico"></div>
+    </div>
+
+    <div class="stat-grid" id="statGrid">
+      <div class="stat st-atrasado" data-status="atrasado">
+        <div class="num" id="c-atrasado">0</div>
+        <div class="lbl">Atrasadas</div>
+      </div>
+      <div class="stat st-vence-hoje" data-status="vence-hoje">
+        <div class="num" id="c-vence-hoje">0</div>
+        <div class="lbl">Vence hoje</div>
+      </div>
+      <div class="stat st-vence-1-dia" data-status="vence-1-dia">
+        <div class="num" id="c-vence-1-dia">0</div>
+        <div class="lbl">Vence em 1 dia</div>
+      </div>
+      <div class="stat st-no-prazo" data-status="no-prazo">
+        <div class="num" id="c-no-prazo">0</div>
+        <div class="lbl">No prazo</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input type="text" id="busca" placeholder="Buscar por OS, matrícula ou bairro...">
+      <select id="filtroCidade"><option value="">Todas as cidades</option></select>
+    </div>
+
+    <div id="resultCount"></div>
+    <div id="lista"></div>
+  </div>
+
+</main>
+
+<!-- ===================== MODAIS ===================== -->
+<div class="lib-modal-overlay" id="libDeleteOverlay" style="display:none;">
+  <div class="lib-modal">
+    <div class="lib-modal-title">⚠ Excluir pasta?</div>
+    <p class="lib-modal-text" id="libDeleteText"></p>
+    <div class="lib-modal-actions">
+      <button class="mini-btn" id="libDeleteCancel">Cancelar</button>
+      <button class="mini-btn danger" id="libDeleteConfirm">Excluir</button>
+    </div>
+  </div>
+</div>
+
+<div class="lib-modal-overlay" id="libNewFolderOverlay" style="display:none;">
+  <div class="lib-modal">
+    <div class="lib-modal-title plain">Nova pasta</div>
+    <p class="lib-modal-text" id="libNewFolderContext"></p>
+    <input type="text" id="libNewFolderInput" class="lib-modal-input" placeholder="Nome da pasta" maxlength="120">
+    <div class="lib-modal-actions">
+      <button class="mini-btn" id="libNewFolderCancel">Cancelar</button>
+      <button class="mini-btn dark" id="libNewFolderConfirm">Criar pasta</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==========================================================
+// CONFIG — regras de leitura da planilha
+// ==========================================================
+const SITUACOES_VALIDAS = ["PENDENTE","POSTERGADA","PROGRAMADO"];
+
+function semAcento(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+function extrairDescricaoServico(v){
+  if(v===undefined||v===null) return "";
+  let s = String(v).trim();
+  const seps = [' - ',': ',' – ',' — '];
+  for(const sep of seps){
+    if(s.includes(sep)){
+      const idx = s.indexOf(sep);
+      return s.slice(idx+sep.length).trim();
+    }
+  }
+  const m = s.match(/^\d+\s+(.+)$/);
+  if(m) return m[1].trim();
+  return s;
+}
+
+function parseData(v){
+  if(v===undefined||v===null||v==='') return null;
+  if(v instanceof Date && !isNaN(v)) return v;
+  const s = String(v).trim();
+  let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})[ T]?(\d{1,2})?:?(\d{1,2})?:?(\d{1,2})?/);
+  if(m){
+    let [,d,mo,y,h,mi,se] = m;
+    if(y.length===2) y = '20'+y;
+    const dt = new Date(+y, +mo-1, +d, +(h||0), +(mi||0), +(se||0));
+    if(!isNaN(dt)) return dt;
+  }
+  const generic = new Date(s);
+  if(!isNaN(generic)) return generic;
+  return null;
+}
+
+function calcularDiasAtraso(dataVal, situacaoUpper){
+  const d = parseData(dataVal);
+  if(!d) return {dias:0, status:'no-prazo'};
+  const agora = new Date();
+  const diffHoras = (d - agora) / 3600000;
+  let dias, status;
+  if(diffHoras < 0){
+    const diasAtraso = Math.floor(Math.abs(diffHoras)/24);
+    dias = diasAtraso;
+    status = 'atrasado';
+    if(diasAtraso === 0) dias = Math.floor(Math.abs(diffHoras));
+  } else if(diffHoras <= 24){
+    dias = 0; status = 'vence-hoje';
+  } else if(diffHoras <= 48){
+    dias = 1; status = 'vence-1-dia';
+  } else {
+    dias = Math.floor(diffHoras/24);
+    status = 'no-prazo';
+  }
+  if(situacaoUpper === 'PROGRAMADO' && status === 'atrasado'){
+    status = 'no-prazo';
+  }
+  return {dias, status};
+}
+
+function fmtData(d){
+  if(!d) return '';
+  const pad = n => String(n).padStart(2,'0');
+  return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function acharColunaPorPalavraChave(headers, palavras, excluir){
+  for(let i=0;i<headers.length;i++){
+    const h = String(headers[i]||'').toUpperCase();
+    if(excluir && h.includes(excluir)) continue;
+    if(palavras.some(p => h.includes(p))) return i;
+  }
+  return -1;
+}
+
+// Lê a planilha inteira: aplica só a regra de "situação válida" (regra de
+// negócio fixa). Cidade e serviço NÃO são mais filtrados aqui — isso agora
+// é decidido pelas pastas que o usuário configurar.
+function processarPlanilha(rows){
+  if(rows.length < 2) throw new Error("A planilha parece estar vazia.");
+  const headers = rows[0];
+  const nCols = headers.length;
+  const idx = (fixo, minCols) => (nCols > minCols ? fixo : Math.min(fixo, nCols-1));
+
+  let motivoCol = acharColunaPorPalavraChave(headers, ['MOTIVO','NAO EXECUCAO','NÃO EXECUÇÃO','EXECUCAO','EXECUÇÃO']);
+  let parecerNaoExecCol = acharColunaPorPalavraChave(headers, ['PARECER','NAO EXECUCAO','NÃO EXECUÇÃO'], 'SOLICITANTE');
+  let parecerSolicCol = acharColunaPorPalavraChave(headers, ['PARECER','SOLICITANTE']);
+  let bairroCol = acharColunaPorPalavraChave(headers, ['BAIRRO']);
+
+  const colOS = idx(1, 1), colCidade = idx(6,6), colMatricula = idx(7,7),
+        colSituacaoOS = idx(8,8), colServico = idx(9,9), colData = idx(25,25), colSituacao = idx(21,21);
+  if(motivoCol === -1) motivoCol = nCols > 24 ? 24 : -1;
+  if(parecerNaoExecCol === -1) parecerNaoExecCol = nCols > 23 ? 23 : -1;
+  if(parecerSolicCol === -1) parecerSolicCol = nCols > 22 ? 22 : -1;
+  if(bairroCol === -1) bairroCol = nCols > 5 ? 5 : -1;
+
+  const resultado = [];
+  for(let r=1; r<rows.length; r++){
+    const row = rows[r];
+    if(!row || row.length===0) continue;
+    const situacao = String(row[colSituacao] ?? '').toUpperCase().trim();
+    if(!SITUACOES_VALIDAS.includes(situacao)) continue;
+
+    const cidade = String(row[colCidade] ?? '').trim();
+    const servicoOriginal = row[colServico] ?? '';
+    const servicoDescricao = extrairDescricaoServico(servicoOriginal).trim();
+    if(!cidade || !servicoDescricao) continue;
+
+    const { dias, status } = calcularDiasAtraso(row[colData], situacao);
+
+    resultado.push({
+      os: String(row[colOS] ?? ''),
+      cidade,
+      bairro: bairroCol>=0 ? String(row[bairroCol] ?? '').trim() : '',
+      matricula: String(row[colMatricula] ?? ''),
+      situacaoOS: String(row[colSituacaoOS] ?? '').trim(),
+      servico: servicoDescricao,
+      situacao,
+      motivo: motivoCol>=0 ? String(row[motivoCol] ?? '').trim() : '',
+      parecerNaoExec: parecerNaoExecCol>=0 ? String(row[parecerNaoExecCol] ?? '').trim() : '',
+      parecerSolic: parecerSolicCol>=0 ? String(row[parecerSolicCol] ?? '').trim() : '',
+      dataFormatada: fmtData(parseData(row[colData])),
+      dias, status
+    });
+  }
+  return resultado;
+}
+
+// ==========================================================
+// PASTAS — persistidas no Firestore (compartilhadas entre usuários)
+// ==========================================================
+// Documento único e compartilhado: todos os usuários logados leem daqui;
+// só o admin tem permissão (garantida também pelas regras do Firestore)
+// para gravar.
+let PASTAS_DOC_REF = null; // definido depois do login, em iniciarSincronizacaoPastas()
+
+function savePastas(){
+  if(!isAdmin || !PASTAS_DOC_REF) return;
+  PASTAS_DOC_REF.set(pastas).catch(err => {
+    console.error('Erro ao salvar pastas no Firestore:', err);
+  });
+}
+function uid(){
+  return 'f_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+// Converte texto colado (separado por vírgula ou linha) em uma lista limpa.
+function parseList(raw){
+  if(!raw) return [];
+  return raw.split(/[\n,]/).map(s=>s.trim()).filter(Boolean);
+}
+
+let pastas = {};
+let isAdmin = false;             // definido após o login, lendo o papel do usuário
+let currentFolderId = null;      // pasta sendo visualizada na biblioteca (null = raiz)
+let folderSettingsOpen = false;  // engrenagem: mostra/esconde os critérios da pasta atual
+let draggingFolderId = null;
+let pendingDeleteFolderId = null;
+
+function folderChildren(parentId){
+  return Object.keys(pastas)
+    .filter(id => (pastas[id].parentId || null) === (parentId || null))
+    .sort((a,b) => (pastas[a].nome||'').localeCompare(pastas[b].nome||'', 'pt-BR'));
+}
+function isLeaf(id){ return folderChildren(id).length === 0; }
+
+function isDescendant(candidateId, ancestorId){
+  let cur = pastas[candidateId];
+  let guard = 0;
+  while(cur && cur.parentId && guard < 50){
+    if(cur.parentId === ancestorId) return true;
+    cur = pastas[cur.parentId];
+    guard++;
+  }
+  return false;
+}
+
+function folderIconSvg(){
+  return '<svg class="folder-ico" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8A33D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>' +
+    '</svg>';
+}
+
+function gearIconSvg(){
+  return '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+    '<circle cx="12" cy="12" r="3"/>' +
+    '<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>' +
+    '</svg>';
+}
+
+function createFolder(name, parentId){
+  if(!isAdmin) return;
+  const id = uid();
+  // Ao criar uma pasta filha, copiamos as cidades já configuradas na pasta
+  // pai (e ancestrais) como valores visíveis e editáveis na nova pasta.
+  // Serviços e palavras-chave ficam em branco para você configurar.
+  const cidadesIniciais = parentId ? effectiveCriteria(parentId).cidades.slice() : [];
+  pastas[id] = { id, nome: name, parentId: parentId || null, cidades: cidadesIniciais, servicos: [], palavrasChave: [] };
+  savePastas();
+  computeMatches();
+  renderLibrary();
+}
+
+function renameFolder(id, newName){
+  if(!isAdmin) return;
+  const f = pastas[id];
+  if(!f) return;
+  const name = newName.trim();
+  if(!name || name === f.nome){ renderLibGrid(); return; }
+  f.nome = name;
+  savePastas();
+  renderLibrary();
+}
+
+function deleteFolder(id){
+  if(!isAdmin) return;
+  const f = pastas[id];
+  if(!f) return;
+  delete pastas[id];
+  // Subpastas ficam órfãs -> viram raiz.
+  Object.keys(pastas).forEach(pid => {
+    if(pastas[pid].parentId === id) pastas[pid].parentId = null;
+  });
+  savePastas();
+  if(currentFolderId === id) currentFolderId = f.parentId || null;
+  computeMatches();
+  renderLibrary();
+}
+
+function moveFolder(draggedId, newParentId){
+  if(!isAdmin) return;
+  const f = pastas[draggedId];
+  if(!f) return;
+  if(draggedId === newParentId) return;
+  if(newParentId && isDescendant(newParentId, draggedId)) return;
+  if((f.parentId || null) === (newParentId || null)) return;
+  if(newParentId && !isLeaf(newParentId)){
+    // ok, pode ter pastas e subpastas juntas normalmente
+  }
+  f.parentId = newParentId || null;
+  savePastas();
+  renderLibrary();
+}
+
+// ---- Critérios (cidades / serviços) de uma pasta-folha ----
+function addCriterio(folderId, campo, raw){
+  if(!isAdmin) return;
+  const f = pastas[folderId];
+  if(!f) return;
+  const novos = parseList(raw);
+  if(!novos.length) return;
+  const atuais = f[campo] || [];
+  const set = new Set(atuais.map(v=>v));
+  novos.forEach(v => set.add(v));
+  f[campo] = Array.from(set);
+  savePastas();
+  computeMatches();
+  renderFolderDetail();
+  renderLibGrid();
+}
+function removeCriterio(folderId, campo, valor){
+  if(!isAdmin) return;
+  const f = pastas[folderId];
+  if(!f) return;
+  f[campo] = (f[campo]||[]).filter(v => v !== valor);
+  savePastas();
+  computeMatches();
+  renderFolderDetail();
+  renderLibGrid();
+}
+
+
+// ==========================================================
+// ROTEAMENTO — distribui as OS da planilha entre as pastas
+// ==========================================================
+let DADOS_BRUTOS = [];         // todas as OS válidas lidas da última planilha
+let matchesPorPasta = {};      // folderId (pasta-folha) -> array de OS
+let ultimoUpload = null;       // {nome, hora}
+
+// Junta os critérios de uma pasta com os de todas as pastas acima dela na
+// árvore (pai, avô...). Isso é o que permite que uma subpasta herde
+// automaticamente a configuração da pasta raiz/pai, sem precisar repetir.
+function effectiveCriteria(folderId){
+  const cidades = new Set(), servicos = new Set(), palavras = new Set();
+  let cur = folderId, guard = 0;
+  while(cur && guard < 50){
+    const f = pastas[cur];
+    if(!f) break;
+    (f.cidades||[]).forEach(v => cidades.add(v));
+    (f.servicos||[]).forEach(v => servicos.add(v));
+    (f.palavrasChave||[]).forEach(v => palavras.add(v));
+    cur = f.parentId || null;
+    guard++;
+  }
+  return { cidades: Array.from(cidades), servicos: Array.from(servicos), palavras: Array.from(palavras) };
+}
+
+function computeMatches(){
+  matchesPorPasta = {};
+  const leaves = Object.keys(pastas).filter(id => isLeaf(id));
+  leaves.forEach(id => matchesPorPasta[id] = []);
+  if(!DADOS_BRUTOS.length) { updateStatusBar(); return; }
+
+  DADOS_BRUTOS.forEach(row => {
+    const cidadeNorm = semAcento(row.cidade);
+    const servicoNorm = semAcento(row.servico);
+    leaves.forEach(id => {
+      const f = pastas[id];
+      // A pasta usa apenas os próprios critérios (os que aparecem na tela
+      // dela). Não herda mais nada "por baixo dos panos" das pastas acima —
+      // se quiser as mesmas cidades da pasta-mãe, copie-as para esta pasta.
+      const cidades = f.cidades || [];
+      const servicos = f.servicos || [];
+      const palavras = f.palavrasChave || [];
+      if(!cidades.length && !servicos.length && !palavras.length) return; // pasta sem nenhum critério próprio não recebe nada
+      const cidadeOk = !cidades.length || cidades.some(c => semAcento(c) === cidadeNorm);
+      // Serviço bate se o nome for exatamente igual a um da lista de serviços
+      // OU se contiver alguma das palavras-chave configuradas. Se nenhum dos
+      // dois campos de serviço estiver preenchido, qualquer serviço passa.
+      const temFiltroServico = servicos.length || palavras.length;
+      const bateExato = servicos.length && servicos.some(s => semAcento(s) === servicoNorm);
+      const batePalavra = palavras.length && palavras.some(p => servicoNorm.includes(semAcento(p)));
+      const servicoOk = !temFiltroServico || bateExato || batePalavra;
+      if(cidadeOk && servicoOk) matchesPorPasta[id].push(row);
+    });
+  });
+  updateStatusBar();
+}
+
+// Junta as OS de uma pasta-folha (ou, se for uma pasta com subpastas, de
+// todas as folhas descendentes dela) em uma única lista.
+function collectMatchesRecursive(id){
+  if(isLeaf(id)) return matchesPorPasta[id] || [];
+  let out = [];
+  folderChildren(id).forEach(cid => { out = out.concat(collectMatchesRecursive(cid)); });
+  return out;
+}
+
+// Soma recursiva de OS já roteadas para uma pasta e todas as suas subpastas.
+function countMatchesRecursive(id){
+  return collectMatchesRecursive(id).length;
+}
+
+function updateStatusBar(){
+  const dot = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  const btnLimpar = document.getElementById('btnLimpar');
+  if(!DADOS_BRUTOS.length){
+    dot.className = 'status-dot';
+    text.textContent = 'Nenhuma planilha enviada ainda. Crie suas pastas e depois envie o arquivo.';
+    btnLimpar.style.display = 'none';
+    return;
+  }
+  dot.className = 'status-dot ok';
+  const roteadas = Object.values(matchesPorPasta).reduce((s,a)=>s+a.length,0);
+  const hora = ultimoUpload ? ultimoUpload.hora : '';
+  text.textContent = `${DADOS_BRUTOS.length} OS carregadas · ${roteadas} distribuídas nas pastas${hora ? ' · ' + hora : ''}`;
+  btnLimpar.style.display = 'inline-block';
+}
+
+// ==========================================================
+// UPLOAD DA PLANILHA
+// ==========================================================
+const fileInput = document.getElementById('fileInput');
+const errEl = document.getElementById('errorBox');
+
+fileInput.addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  errEl.style.display = 'none';
+  document.getElementById('statusDot').className = 'status-dot loading';
+  document.getElementById('statusText').textContent = 'Lendo arquivo...';
+
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'array', cellDates:true});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:''});
+      const dados = processarPlanilha(rows);
+      if(dados.length === 0){
+        errEl.style.display = 'block';
+        errEl.textContent = 'Nenhuma OS válida encontrada (verifique se as colunas de cidade, situação e serviço estão no formato esperado).';
+        updateStatusBar();
+        return;
+      }
+      DADOS_BRUTOS = dados;
+      ultimoUpload = { nome: file.name, hora: new Date().toLocaleString('pt-BR', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'}) };
+      computeMatches();
+      renderLibrary();
+    }catch(err){
+      errEl.style.display = 'block';
+      errEl.textContent = 'Erro ao processar o arquivo: ' + err.message;
+      updateStatusBar();
+    }finally{
+      fileInput.value = '';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+document.getElementById('btnLimpar').addEventListener('click', function(){
+  DADOS_BRUTOS = [];
+  ultimoUpload = null;
+  computeMatches();
+  renderLibrary();
+});
+
+// ==========================================================
+// BIBLIOTECA — grade de pastas, breadcrumb, detalhe
+// ==========================================================
+const libBreadcrumb = document.getElementById('libBreadcrumb');
+const libGrid = document.getElementById('libGrid');
+const newFolderBtn = document.getElementById('newFolderBtn');
+const folderDetail = document.getElementById('folderDetail');
+
+const libDeleteOverlay = document.getElementById('libDeleteOverlay');
+const libDeleteText = document.getElementById('libDeleteText');
+const libDeleteCancel = document.getElementById('libDeleteCancel');
+const libDeleteConfirm = document.getElementById('libDeleteConfirm');
+
+const libNewFolderOverlay = document.getElementById('libNewFolderOverlay');
+const libNewFolderContext = document.getElementById('libNewFolderContext');
+const libNewFolderInput = document.getElementById('libNewFolderInput');
+const libNewFolderCancel = document.getElementById('libNewFolderCancel');
+const libNewFolderConfirm = document.getElementById('libNewFolderConfirm');
+
+function addCrumbDropTarget(el, folderId){
+  el.addEventListener('dragover', (e) => {
+    if(!isAdmin || !draggingFolderId) return;
+    if(draggingFolderId === folderId) return;
+    if(folderId && isDescendant(folderId, draggingFolderId)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('drag-over');
+  });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', (e) => {
+    if(!isAdmin) return;
+    e.preventDefault();
+    el.classList.remove('drag-over');
+    const draggedId = draggingFolderId || e.dataTransfer.getData('text/plain');
+    if(!draggedId) return;
+    moveFolder(draggedId, folderId);
+  });
+}
+
+function renderBreadcrumb(){
+  libBreadcrumb.innerHTML = '';
+  const chain = [];
+  let cur = currentFolderId, guard = 0;
+  while(cur && guard < 50){
+    const f = pastas[cur];
+    if(!f) break;
+    chain.unshift({id:cur, nome:f.nome || '(sem nome)'});
+    cur = f.parentId || null;
+    guard++;
+  }
+  const rootCrumb = document.createElement('button');
+  rootCrumb.type = 'button';
+  rootCrumb.className = 'lib-crumb' + (currentFolderId === null ? ' current' : '');
+  rootCrumb.textContent = 'Pastas';
+  rootCrumb.addEventListener('click', () => { if(currentFolderId !== null){ currentFolderId = null; folderSettingsOpen = false; renderLibrary(); } });
+  addCrumbDropTarget(rootCrumb, null);
+  libBreadcrumb.appendChild(rootCrumb);
+
+  chain.forEach((node, i) => {
+    const sep = document.createElement('span');
+    sep.className = 'lib-crumb-sep';
+    sep.textContent = '/';
+    libBreadcrumb.appendChild(sep);
+    const isCurrent = i === chain.length - 1;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'lib-crumb' + (isCurrent ? ' current' : '');
+    btn.textContent = node.nome;
+    btn.addEventListener('click', () => { if(!isCurrent){ currentFolderId = node.id; folderSettingsOpen = false; renderLibrary(); } });
+    addCrumbDropTarget(btn, node.id);
+    libBreadcrumb.appendChild(btn);
+  });
+}
+
+function startRenameCard(id, nameEl){
+  const f = pastas[id];
+  if(!f || nameEl.querySelector('input')) return;
+  const original = f.nome || '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'lib-rename-input';
+  input.value = original;
+  nameEl.textContent = '';
+  nameEl.appendChild(input);
+  input.focus();
+  input.select();
+  let settled = false;
+  const finish = (save) => {
+    if(settled) return;
+    settled = true;
+    if(save && input.value.trim() && input.value.trim() !== original) renameFolder(id, input.value);
+    else renderLibGrid();
+  };
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    if(e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  input.addEventListener('click', (e) => e.stopPropagation());
+  input.addEventListener('mousedown', (e) => e.stopPropagation());
+}
+
+function openDeleteModal(id){
+  const f = pastas[id];
+  if(!f) return;
+  pendingDeleteFolderId = id;
+  const hasChildren = folderChildren(id).length > 0;
+  libDeleteText.innerHTML = hasChildren
+    ? 'Excluir a pasta <b>' + escapeHtml(f.nome||'') + '</b>? As subpastas dentro dela vão virar pastas raiz.'
+    : 'Excluir a pasta <b>' + escapeHtml(f.nome||'') + '</b>? Esta ação não pode ser desfeita.';
+  libDeleteOverlay.style.display = 'flex';
+}
+function closeDeleteModal(){ pendingDeleteFolderId = null; libDeleteOverlay.style.display = 'none'; }
+libDeleteCancel.addEventListener('click', closeDeleteModal);
+libDeleteOverlay.addEventListener('click', (e) => { if(e.target === libDeleteOverlay) closeDeleteModal(); });
+libDeleteConfirm.addEventListener('click', () => {
+  if(!pendingDeleteFolderId) return;
+  const id = pendingDeleteFolderId;
+  closeDeleteModal();
+  deleteFolder(id);
+});
+
+function openNewFolderModal(){
+  const parent = currentFolderId ? pastas[currentFolderId] : null;
+  libNewFolderContext.textContent = parent ? 'Dentro de "' + (parent.nome||'') + '".' : '';
+  libNewFolderInput.value = '';
+  libNewFolderOverlay.style.display = 'flex';
+  setTimeout(() => libNewFolderInput.focus(), 0);
+}
+function closeNewFolderModal(){ libNewFolderOverlay.style.display = 'none'; }
+function confirmNewFolder(){
+  const name = libNewFolderInput.value.trim();
+  if(!name){ libNewFolderInput.focus(); return; }
+  closeNewFolderModal();
+  createFolder(name, currentFolderId);
+}
+libNewFolderCancel.addEventListener('click', closeNewFolderModal);
+libNewFolderOverlay.addEventListener('click', (e) => { if(e.target === libNewFolderOverlay) closeNewFolderModal(); });
+libNewFolderConfirm.addEventListener('click', confirmNewFolder);
+libNewFolderInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); confirmNewFolder(); }
+  if(e.key === 'Escape'){ e.preventDefault(); closeNewFolderModal(); }
+});
+newFolderBtn.addEventListener('click', openNewFolderModal);
+
+function buildLibCard(id){
+  const f = pastas[id];
+  const childCount = folderChildren(id).length;
+  const leaf = childCount === 0;
+  const card = document.createElement('div');
+  card.className = 'lib-card';
+  card.dataset.id = id;
+
+  const icoWrap = document.createElement('div');
+  icoWrap.innerHTML = folderIconSvg();
+  card.appendChild(icoWrap.firstChild);
+
+  const info = document.createElement('div');
+  info.className = 'lib-card-info';
+  const nameEl = document.createElement('span');
+  nameEl.className = 'lib-card-name';
+  nameEl.textContent = f.nome || '(sem nome)';
+  info.appendChild(nameEl);
+
+  const meta = document.createElement('div');
+  // Pastas com subpastas nunca mostram contagem de OS aqui — só a pasta-folha
+  // específica (a que tem os critérios) mostra suas próprias OS.
+  if(!leaf){
+    meta.className = 'lib-card-meta';
+    meta.textContent = childCount + (childCount === 1 ? ' subpasta' : ' subpastas');
+  } else {
+    const osCount = matchesPorPasta[id] ? matchesPorPasta[id].length : 0;
+    if(DADOS_BRUTOS.length && osCount > 0){
+      meta.className = 'lib-card-meta has-os';
+      meta.textContent = osCount + (osCount === 1 ? ' OS' : ' OS');
+    } else {
+      const nCrit = (f.cidades||[]).length + (f.servicos||[]).length + (f.palavrasChave||[]).length;
+      meta.className = 'lib-card-meta';
+      meta.textContent = nCrit ? (nCrit + (nCrit === 1 ? ' critério' : ' critérios')) : 'sem critério definido';
+    }
+  }
+  info.appendChild(meta);
+  card.appendChild(info);
+
+  const actions = document.createElement('div');
+  actions.className = 'lib-card-actions';
+  if(isAdmin){
+    const renameBtn = document.createElement('button');
+    renameBtn.type = 'button'; renameBtn.title = 'Renomear'; renameBtn.textContent = '✎';
+    renameBtn.addEventListener('click', (e) => { e.stopPropagation(); startRenameCard(id, nameEl); });
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button'; delBtn.className = 'lib-del'; delBtn.title = 'Excluir'; delBtn.textContent = '×';
+    delBtn.addEventListener('click', (e) => { e.stopPropagation(); openDeleteModal(id); });
+    actions.appendChild(renameBtn);
+    actions.appendChild(delBtn);
+  }
+  card.appendChild(actions);
+
+  card.draggable = isAdmin;
+  card.addEventListener('dragstart', (e) => {
+    if(!isAdmin){ e.preventDefault(); return; }
+    if(e.target.closest('input')){ e.preventDefault(); return; }
+    draggingFolderId = id;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', id);
+    card.classList.add('dragging');
+  });
+  card.addEventListener('dragend', () => {
+    draggingFolderId = null;
+    card.classList.remove('dragging');
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  });
+  card.addEventListener('dragover', (e) => {
+    if(!isAdmin || !draggingFolderId) return;
+    if(draggingFolderId === id || isDescendant(id, draggingFolderId)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', (e) => {
+    if(!isAdmin) return;
+    e.preventDefault(); e.stopPropagation();
+    card.classList.remove('drag-over');
+    const draggedId = draggingFolderId || e.dataTransfer.getData('text/plain');
+    if(!draggedId || draggedId === id) return;
+    moveFolder(draggedId, id);
+  });
+
+  card.addEventListener('click', (e) => {
+    if(e.target.closest('input') || e.target.closest('.lib-card-actions')) return;
+    currentFolderId = id;
+    folderSettingsOpen = false;
+    renderLibrary();
+  });
+
+  return card;
+}
+
+function renderLibGrid(){
+  libGrid.innerHTML = '';
+  const childIds = folderChildren(currentFolderId);
+  if(!childIds.length){
+    if(!currentFolderId){
+      const empty = document.createElement('div');
+      empty.className = 'lib-empty';
+      empty.textContent = 'Nenhuma pasta criada ainda.';
+      libGrid.appendChild(empty);
+    }
+  } else {
+    childIds.forEach(id => libGrid.appendChild(buildLibCard(id)));
+  }
+}
+
+function renderChipsSection(folderId, campo, titulo, placeholder, textoVazio){
+  const f = pastas[folderId];
+  const valores = f[campo] || [];
+  const wrap = document.createElement('div');
+  wrap.className = 'crit-section';
+
+  const h = document.createElement('div');
+  h.className = 'crit-heading';
+  h.textContent = titulo;
+  wrap.appendChild(h);
+
+  const chipsWrap = document.createElement('div');
+  chipsWrap.className = 'chips';
+  if(!valores.length){
+    const emp = document.createElement('span');
+    emp.className = 'chips-empty';
+    emp.textContent = textoVazio;
+    chipsWrap.appendChild(emp);
+  } else {
+    valores.forEach(v => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = v;
+      const x = document.createElement('button');
+      x.type = 'button'; x.textContent = '×'; x.title = 'Remover';
+      x.addEventListener('click', () => removeCriterio(folderId, campo, v));
+      chip.appendChild(x);
+      chipsWrap.appendChild(chip);
+    });
+  }
+  wrap.appendChild(chipsWrap);
+
+  const addRow = document.createElement('div');
+  addRow.className = 'chip-add';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = placeholder;
+  const btn = document.createElement('button');
+  btn.className = 'mini-btn';
+  btn.type = 'button';
+  btn.textContent = 'Adicionar';
+  const doAdd = () => {
+    if(!input.value.trim()) return;
+    addCriterio(folderId, campo, input.value);
+    input.value = '';
+    input.focus();
+  };
+  btn.addEventListener('click', doAdd);
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); doAdd(); } });
+  addRow.appendChild(input);
+  addRow.appendChild(btn);
+  wrap.appendChild(addRow);
+
+  return wrap;
+}
+
+// ---- Busca de serviços por palavra-chave, com seleção manual ----
+// Guarda o estado da última busca feita (por pasta) para sobreviver a
+// re-renderizações enquanto o admin marca/desmarca os resultados.
+let kwSearchState = { folderId: null, query: '', results: [], selected: new Set() };
+
+function buscarServicosPorPalavra(folderId, query){
+  const q = semAcento(query);
+  const contagem = new Map(); // nome original do serviço -> quantas OS têm esse nome
+  DADOS_BRUTOS.forEach(row => {
+    const nome = String(row.servico || '').trim();
+    if(!nome) return;
+    if(semAcento(nome).includes(q)){
+      contagem.set(nome, (contagem.get(nome) || 0) + 1);
+    }
+  });
+  const results = Array.from(contagem.entries())
+    .map(([nome, count]) => ({ nome, count }))
+    .sort((a, b) => b.count - a.count || a.nome.localeCompare(b.nome, 'pt-BR'));
+  kwSearchState = { folderId, query, results, selected: new Set() };
+}
+
+function renderPalavraChaveBuscaSection(folderId){
+  if(kwSearchState.folderId !== folderId){
+    kwSearchState = { folderId, query: '', results: [], selected: new Set() };
+  }
+  const f = pastas[folderId];
+  const wrap = document.createElement('div');
+  wrap.className = 'crit-section';
+
+  const h = document.createElement('div');
+  h.className = 'crit-heading';
+  h.textContent = 'Buscar serviços por palavra-chave';
+  wrap.appendChild(h);
+
+  const hint = document.createElement('p');
+  hint.className = 'kw-note';
+  hint.textContent = 'Digite um trecho do nome do serviço, veja os serviços encontrados na planilha atual e escolha exatamente quais entram nesta pasta (em vez de puxar tudo que contém o texto).';
+  wrap.appendChild(hint);
+
+  const addRow = document.createElement('div');
+  addRow.className = 'chip-add';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Ex.: Religação';
+  input.value = kwSearchState.query;
+  const btn = document.createElement('button');
+  btn.className = 'mini-btn';
+  btn.type = 'button';
+  btn.textContent = 'Buscar';
+  const doSearch = () => {
+    const val = input.value.trim();
+    if(!val) return;
+    if(!DADOS_BRUTOS.length){ alert('Carregue uma planilha primeiro para buscar os serviços.'); return; }
+    buscarServicosPorPalavra(folderId, val);
+    renderFolderDetail();
+  };
+  btn.addEventListener('click', doSearch);
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); doSearch(); } });
+  addRow.appendChild(input);
+  addRow.appendChild(btn);
+  wrap.appendChild(addRow);
+
+  if(kwSearchState.query){
+    const resultsWrap = document.createElement('div');
+    resultsWrap.className = 'kw-results';
+
+    if(!kwSearchState.results.length){
+      const emp = document.createElement('p');
+      emp.className = 'chips-empty';
+      emp.style.marginTop = '10px';
+      emp.textContent = 'Nenhum serviço encontrado com "' + kwSearchState.query + '" na planilha atual.';
+      resultsWrap.appendChild(emp);
+    } else {
+      const info = document.createElement('p');
+      info.className = 'crit-count';
+      info.style.marginTop = '10px';
+      info.innerHTML = '<b>' + kwSearchState.results.length + '</b> serviço(s) diferente(s) encontrados para "' + kwSearchState.query + '". Marque os que quer adicionar a esta pasta:';
+      resultsWrap.appendChild(info);
+
+      const list = document.createElement('div');
+      list.className = 'kw-result-list';
+      let addSelBtn; // referenciado pelo listener de cada checkbox
+      const updateAddSelBtn = () => {
+        const n = kwSearchState.selected.size;
+        addSelBtn.textContent = n ? ('Adicionar ' + n + ' selecionado' + (n > 1 ? 's' : '')) : 'Adicionar selecionados';
+        addSelBtn.disabled = !n;
+      };
+
+      kwSearchState.results.forEach(({ nome, count }) => {
+        const jaAdicionado = (f.servicos || []).includes(nome);
+        const item = document.createElement('label');
+        item.className = 'kw-result-item' + (jaAdicionado ? ' kw-added' : '');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = kwSearchState.selected.has(nome);
+        cb.disabled = jaAdicionado;
+        cb.addEventListener('change', () => {
+          if(cb.checked) kwSearchState.selected.add(nome);
+          else kwSearchState.selected.delete(nome);
+          updateAddSelBtn();
+        });
+        const txt = document.createElement('span');
+        txt.textContent = nome;
+        const countSpan = document.createElement('span');
+        countSpan.className = 'kw-result-count';
+        countSpan.textContent = jaAdicionado ? 'já adicionado' : (count + ' OS');
+        item.appendChild(cb);
+        item.appendChild(txt);
+        item.appendChild(countSpan);
+        list.appendChild(item);
+      });
+      resultsWrap.appendChild(list);
+
+      const actions = document.createElement('div');
+      actions.className = 'kw-actions';
+      addSelBtn = document.createElement('button');
+      addSelBtn.type = 'button';
+      addSelBtn.className = 'mini-btn dark';
+      updateAddSelBtn();
+      addSelBtn.addEventListener('click', () => {
+        if(!kwSearchState.selected.size) return;
+        const atuais = f.servicos || [];
+        const set = new Set(atuais);
+        kwSearchState.selected.forEach(nome => set.add(nome));
+        f.servicos = Array.from(set);
+        savePastas();
+        computeMatches();
+        kwSearchState = { folderId, query: '', results: [], selected: new Set() };
+        renderFolderDetail();
+        renderLibGrid();
+      });
+      actions.appendChild(addSelBtn);
+      resultsWrap.appendChild(actions);
+    }
+
+    wrap.appendChild(resultsWrap);
+  }
+
+  return wrap;
+}
+
+function renderFolderDetail(){
+  folderDetail.innerHTML = '';
+  if(!currentFolderId){
+    folderDetail.style.display = 'none';
+    return;
+  }
+  const f = pastas[currentFolderId];
+  if(!f){ folderDetail.style.display = 'none'; return; }
+  folderDetail.style.display = 'block';
+  const temSubpastas = !isLeaf(currentFolderId);
+  // Só pastas-folha (sem subpastas) têm OS próprias. Uma pasta com
+  // subpastas não soma mais o que está dentro delas.
+  const count = temSubpastas ? 0 : (matchesPorPasta[currentFolderId] ? matchesPorPasta[currentFolderId].length : 0);
+
+  // Linha principal: só o botão "Ver OS desta pasta" + engrenagem discreta.
+  const topRow = document.createElement('div');
+  topRow.className = 'folder-detail-top';
+
+  const verBtn = document.createElement('button');
+  verBtn.className = 'mini-btn dark';
+  verBtn.textContent = 'Ver OS desta pasta';
+  verBtn.disabled = temSubpastas || !(DADOS_BRUTOS.length && count > 0);
+  verBtn.addEventListener('click', () => abrirPasta(currentFolderId));
+  topRow.appendChild(verBtn);
+
+  const gearBtn = document.createElement('button');
+  gearBtn.type = 'button';
+  gearBtn.className = 'gear-btn' + (folderSettingsOpen ? ' open' : '');
+  gearBtn.title = 'Configurar cidades e serviços desta pasta';
+  gearBtn.innerHTML = gearIconSvg();
+  gearBtn.addEventListener('click', () => { folderSettingsOpen = !folderSettingsOpen; renderFolderDetail(); });
+  if(isAdmin) topRow.appendChild(gearBtn);
+
+  folderDetail.appendChild(topRow);
+
+  const countEl = document.createElement('p');
+  countEl.className = 'crit-count';
+  if(temSubpastas){
+    countEl.textContent = '';
+  } else if(DADOS_BRUTOS.length){
+    countEl.innerHTML = '<b>' + count + '</b> OS ' + (count===1?'entrou':'entraram') + ' nesta pasta com a planilha atual.';
+  } else {
+    countEl.textContent = '';
+  }
+  folderDetail.appendChild(countEl);
+
+  // Critérios só aparecem quando a engrenagem é aberta (só para admin).
+  if(!isAdmin || !folderSettingsOpen) return;
+
+  const block = document.createElement('div');
+  block.className = 'crit-block';
+  // Se esta pasta ainda não tem cidades próprias mas tem uma pasta-mãe com
+  // cidades configuradas, oferece um botão para copiar de uma vez (cobre o
+  // caso de pastas criadas antes desse recurso existir).
+  if(f.parentId && !(f.cidades||[]).length){
+    const eff = effectiveCriteria(f.parentId);
+    if(eff.cidades.length){
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'mini-btn';
+      copyBtn.style.marginBottom = '14px';
+      copyBtn.textContent = 'Copiar cidades da pasta acima (' + eff.cidades.join(', ') + ')';
+      copyBtn.addEventListener('click', () => {
+        f.cidades = eff.cidades.slice();
+        savePastas();
+        computeMatches();
+        renderFolderDetail();
+        renderLibGrid();
+      });
+      block.insertBefore(copyBtn, block.firstChild);
+    }
+  }
+
+  block.appendChild(renderChipsSection(currentFolderId, 'cidades', 'Cidades desta pasta', 'Digite a cidade e Enter', 'Qualquer cidade (nenhum filtro definido).'));
+  block.appendChild(renderChipsSection(currentFolderId, 'servicos', 'Serviços desta pasta (nome exato)', 'Digite o serviço (exatamente como na planilha) e Enter', 'Nenhum serviço exato adicionado.'));
+  block.appendChild(renderPalavraChaveBuscaSection(currentFolderId));
+  if((f.palavrasChave || []).length){
+    const legacyWrap = renderChipsSection(currentFolderId, 'palavrasChave', 'Palavras-chave antigas (ainda pegam tudo que contém o texto)', 'Ex.: Religação', 'Nenhuma palavra-chave antiga.');
+    const legacyNote = document.createElement('p');
+    legacyNote.className = 'kw-note';
+    legacyNote.textContent = 'Essas foram adicionadas antes da busca com seleção existir e continuam valendo para qualquer serviço que contenha o texto. Remova-as se preferir controlar tudo pela busca acima.';
+    legacyWrap.insertBefore(legacyNote, legacyWrap.querySelector('.chips'));
+    block.appendChild(legacyWrap);
+  }
+
+  if(temSubpastas){
+    const childNote = document.createElement('p');
+    childNote.className = 'crit-count';
+    childNote.style.color = 'var(--ink-faint)';
+    childNote.textContent = 'Esta pasta tem subpastas, então ela mesma não recebe OS diretamente. Ao criar uma subpasta nova, as cidades definidas aqui são copiadas automaticamente para ela.';
+    block.appendChild(childNote);
+  }
+
+  folderDetail.appendChild(block);
+}
+
+function renderLibrary(){
+  newFolderBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+  renderBreadcrumb();
+  renderLibGrid();
+  renderFolderDetail();
+}
+
+// ==========================================================
+// DASHBOARD DE UMA PASTA (reaproveita a mecânica original)
+// ==========================================================
+let DADOS = [];
+let statusAtivo = null;
+let servicoAtivo = null;
+let pastaAbertaId = null;
+let situacoesAtivas = []; // filtro multi-seleção: PENDENTE / POSTERGADA / PROGRAMADO (vazio = todas)
+
+// Retorna DADOS já filtrados pelas situações ativas (Pendente/Postergada/Programado).
+// Se nenhum filtro estiver ativo, retorna tudo.
+function dadosFiltradosPastaAberta(){
+  if(!situacoesAtivas.length) return DADOS;
+  return DADOS.filter(d => situacoesAtivas.includes(d.situacao));
+}
+
+function nomeCompletoPasta(id){
+  const chain = [];
+  let cur = id, guard = 0;
+  while(cur && guard < 50){
+    const f = pastas[cur];
+    if(!f) break;
+    chain.unshift(f.nome || '(sem nome)');
+    cur = f.parentId || null;
+    guard++;
+  }
+  return chain.join(' / ');
+}
+
+function abrirPasta(folderId){
+  pastaAbertaId = folderId;
+  DADOS = collectMatchesRecursive(folderId).slice();
+  statusAtivo = null;
+  servicoAtivo = null;
+  situacoesAtivas = [];
+  document.querySelectorAll('.filtro-situacao-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tituloPastaAberta').textContent = pastas[folderId] ? pastas[folderId].nome : '';
+  document.getElementById('subPastaAberta').textContent = nomeCompletoPasta(folderId);
+  document.getElementById('buscaServico').value = '';
+
+  const cidades = [...new Set(DADOS.map(d=>d.cidade))].sort();
+  const selCidade = document.getElementById('filtroCidade');
+  selCidade.innerHTML = '<option value="">Todas as cidades</option>' + cidades.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+  atualizarGauge();
+  renderListaServicos();
+  mostrarViewServicos();
+  window.scrollTo(0,0);
+}
+
+function voltarBiblioteca(){
+  document.getElementById('screenLibrary').style.display = 'block';
+  document.getElementById('viewServicos').style.display = 'none';
+  document.getElementById('viewDetalhe').style.display = 'none';
+  folderSettingsOpen = false;
+  renderLibrary();
+}
+document.getElementById('btnVoltarBiblioteca').addEventListener('click', voltarBiblioteca);
+
+function atualizarGauge(){
+  const base = dadosFiltradosPastaAberta();
+  const atrasadas = base.filter(d=>d.status==='atrasado').length;
+  const pct = base.length ? Math.round((atrasadas / base.length) * 100) : 0;
+  document.getElementById('pctAtrasado').textContent = pct + '%';
+  document.getElementById('totalOs').textContent = `${base.length} OS no total`;
+  desenharGauge(pct);
+}
+
+function desenharGauge(pct){
+  const svg = document.getElementById('gaugeSvg');
+  const r = 36, cx=43, cy=43, circ = 2*Math.PI*r;
+  const offset = circ * (1 - pct/100);
+  svg.innerHTML = `
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E4EBE8" stroke-width="9"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--atrasado)" stroke-width="9"
+      stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+      transform="rotate(-90 ${cx} ${cy})"/>`;
+}
+
+// Estatísticas por serviço, dentro da pasta aberta (sem os grupos fixos de
+// Fiscalização/Religação — agora a organização é 100% pelas pastas).
+function construirEstatisticasServico(){
+  const grupos = {};
+  dadosFiltradosPastaAberta().forEach(d=>{
+    if(!grupos[d.servico]) grupos[d.servico] = {total:0, atrasadas:0};
+    grupos[d.servico].total++;
+    if(d.status === 'atrasado') grupos[d.servico].atrasadas++;
+  });
+  return grupos;
+}
+
+function renderListaServicos(){
+  const busca = semAcento(document.getElementById('buscaServico').value);
+  const grupos = construirEstatisticasServico();
+  const cont = document.getElementById('listaServicos');
+  let html = '';
+
+  const nomes = Object.keys(grupos)
+    .filter(nome => !busca || semAcento(nome).includes(busca))
+    .sort((a,b)=> grupos[b].total - grupos[a].total);
+
+  nomes.forEach(nome=>{
+    const st = grupos[nome];
+    const temAtraso = st.atrasadas > 0;
+    html += `
+      <div class="servico-card ${temAtraso?'tem-atraso':''}" onclick="abrirServico('${nome.replace(/'/g,"\\'")}')">
+        <div>
+          <div class="servico-nome">${escapeHtml(nome)}</div>
+          <div class="servico-total">${st.total} OS</div>
+        </div>
+        <div class="servico-right">
+          ${temAtraso ? `<span class="pill">${st.atrasadas} atrasada${st.atrasadas>1?'s':''}</span>` : ''}
+          <span class="chevron">›</span>
+        </div>
+      </div>`;
+  });
+
+  cont.innerHTML = html || '<div class="empty">Nenhum serviço encontrado.</div>';
+}
+document.getElementById('buscaServico').addEventListener('input', renderListaServicos);
+
+document.querySelectorAll('.filtro-situacao-btn').forEach(btn => {
+  btn.addEventListener('click', function(){
+    const s = this.dataset.situacao;
+    const i = situacoesAtivas.indexOf(s);
+    if(i === -1){
+      situacoesAtivas.push(s);
+      this.classList.add('active');
+    } else {
+      situacoesAtivas.splice(i, 1);
+      this.classList.remove('active');
+    }
+    atualizarGauge();
+    renderListaServicos();
+  });
+});
+
+function mostrarViewServicos(){
+  document.getElementById('screenLibrary').style.display = 'none';
+  document.getElementById('viewServicos').style.display = 'block';
+  document.getElementById('viewDetalhe').style.display = 'none';
+}
+function mostrarViewDetalhe(){
+  document.getElementById('viewServicos').style.display = 'none';
+  document.getElementById('viewDetalhe').style.display = 'block';
+}
+
+function abrirServico(nome){
+  servicoAtivo = nome;
+  statusAtivo = null;
+  document.getElementById('busca').value = '';
+  document.getElementById('filtroCidade').value = '';
+  document.getElementById('tituloServico').textContent = nome;
+  document.querySelectorAll('.stat').forEach(x=>x.classList.remove('active'));
+  atualizarContadoresServico();
+  aplicarFiltros();
+  mostrarViewDetalhe();
+  window.scrollTo(0,0);
+}
+document.getElementById('btnVoltar').addEventListener('click', mostrarViewServicos);
+
+function atualizarContadoresServico(){
+  const itens = dadosFiltradosPastaAberta().filter(d=>d.servico === servicoAtivo);
+  const counts = {atrasado:0,'vence-hoje':0,'vence-1-dia':0,'no-prazo':0};
+  itens.forEach(d=>{ counts[d.status] = (counts[d.status]||0)+1; });
+  document.getElementById('c-atrasado').textContent = counts.atrasado;
+  document.getElementById('c-vence-hoje').textContent = counts['vence-hoje'];
+  document.getElementById('c-vence-1-dia').textContent = counts['vence-1-dia'];
+  document.getElementById('c-no-prazo').textContent = counts['no-prazo'];
+}
+
+document.querySelectorAll('.stat').forEach(el=>{
+  el.addEventListener('click', function(){
+    const s = this.dataset.status;
+    statusAtivo = (statusAtivo === s) ? null : s;
+    document.querySelectorAll('.stat').forEach(x=>x.classList.remove('active'));
+    if(statusAtivo) this.classList.add('active');
+    aplicarFiltros();
+  });
+});
+
+['busca','filtroCidade'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', aplicarFiltros);
+  document.getElementById(id).addEventListener('change', aplicarFiltros);
+});
+
+const ORDEM_STATUS = {'atrasado':0,'vence-hoje':1,'vence-1-dia':2,'no-prazo':3};
+
+function aplicarFiltros(){
+  if(!servicoAtivo) return;
+  const busca = semAcento(document.getElementById('busca').value);
+  const cidade = document.getElementById('filtroCidade').value;
+
+  let filtrados = dadosFiltradosPastaAberta().filter(d=>{
+    if(d.servico !== servicoAtivo) return false;
+    if(statusAtivo && d.status !== statusAtivo) return false;
+    if(cidade && d.cidade !== cidade) return false;
+    if(busca){
+      const alvo = semAcento(`${d.os} ${d.matricula} ${d.bairro} ${d.cidade}`);
+      if(!alvo.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  filtrados.sort((a,b)=>{
+    const oa = ORDEM_STATUS[a.status], ob = ORDEM_STATUS[b.status];
+    if(oa !== ob) return oa - ob;
+    return b.dias - a.dias;
+  });
+
+  document.getElementById('resultCount').textContent = `${filtrados.length} OS encontradas`;
+  renderLista(filtrados);
+}
+
+const LABEL_STATUS = {'atrasado':'ATRASADA','vence-hoje':'VENCE HOJE','vence-1-dia':'VENCE EM 1 DIA','no-prazo':'NO PRAZO'};
+
+function renderLista(lista){
+  const cont = document.getElementById('lista');
+  if(lista.length === 0){
+    cont.innerHTML = '<div class="empty">Nenhuma OS encontrada com esses filtros.</div>';
+    return;
+  }
+  cont.innerHTML = lista.map((d, i)=>{
+    const diasLabel = d.status==='atrasado'
+      ? (d.dias===0 ? 'há poucas horas' : `há ${d.dias} dia${d.dias>1?'s':''}`)
+      : (d.status==='no-prazo' ? `em ${d.dias} dia${d.dias!==1?'s':''}` : '');
+    return `
+    <div class="card st-${d.status}">
+      <div class="card-head" onclick="toggleCard(${i})">
+        <div class="left">
+          <div class="card-os">OS ${escapeHtml(d.os)}</div>
+          <div class="card-local">${escapeHtml(d.cidade)}${d.bairro ? ' — ' + escapeHtml(d.bairro) : ''}</div>
+        </div>
+        <div class="badge st-${d.status}">${LABEL_STATUS[d.status]}${diasLabel ? '<br>'+diasLabel : ''}</div>
+      </div>
+      <div class="card-body" id="body-${i}">
+        <div><b>Matrícula:</b> ${escapeHtml(d.matricula || '—')}</div>
+        <div><b>Situação OS:</b> ${escapeHtml(d.situacaoOS || '—')}</div>
+        <div><b>Situação:</b> ${escapeHtml(d.situacao || '—')}</div>
+        <div><b>Prazo:</b> ${escapeHtml(d.dataFormatada || '—')}</div>
+        <div><b>Motivo não execução:</b> ${escapeHtml(d.motivo || '—')}</div>
+        <div><b>Parecer não execução:</b> ${escapeHtml(d.parecerNaoExec || '—')}</div>
+        <div><b>Parecer solicitante:</b> ${escapeHtml(d.parecerSolic || '—')}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(i){
+  document.getElementById('body-'+i).classList.toggle('open');
+}
+
+// ---------- Init ----------
+// computeMatches() e renderLibrary() agora são chamados depois que as
+// pastas são carregadas do Firestore (ver bloco de autenticação abaixo).
+</script>
+
+</div><!-- /#appShell -->
+
+<!-- ===================== FIREBASE (AUTH + FIRESTORE) ===================== -->
+<script>
+  // Substitua pelos dados do SEU projeto Firebase
+  // (Console Firebase > Configurações do projeto > Seus apps > SDK setup).
+  const firebaseConfig = {
+    apiKey: "AIzaSyBzLv97CPUrC1iMpgBNDMEmHy440FSNop0",
+    authDomain: "ordem-de-servico-d171f.firebaseapp.com",
+    projectId: "ordem-de-servico-d171f",
+    storageBucket: "ordem-de-servico-d171f.firebasestorage.app",
+    messagingSenderId: "483372906532",
+    appId: "1:483372906532:web:d8a958bfdac29a3e7fc0b1"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Documento único e compartilhado com todas as pastas.
+  // (a variável PASTAS_DOC_REF já foi declarada lá em cima, junto da lógica de pastas)
+  PASTAS_DOC_REF = db.collection('config').doc('pastas');
+
+  const loginScreen = document.getElementById('loginScreen');
+  const appShell = document.getElementById('appShell');
+  const loginForm = document.getElementById('loginForm');
+  const loginError = document.getElementById('loginError');
+  const loginBtn = document.getElementById('loginBtn');
+  const headerRole = document.getElementById('headerRole');
+
+  function mostrarErroLogin(msg){
+    loginError.textContent = msg;
+    loginError.classList.add('show');
+  }
+  function limparErroLogin(){
+    loginError.classList.remove('show');
+    loginError.textContent = '';
+  }
+
+  const MENSAGENS_ERRO = {
+    'auth/invalid-email': 'E-mail inválido.',
+    'auth/user-disabled': 'Este usuário foi desativado.',
+    'auth/user-not-found': 'E-mail ou senha incorretos.',
+    'auth/wrong-password': 'E-mail ou senha incorretos.',
+    'auth/invalid-credential': 'E-mail ou senha incorretos.',
+    'auth/too-many-requests': 'Muitas tentativas. Tente novamente em instantes.'
+  };
+
+  loginForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    limparErroLogin();
+    const email = document.getElementById('loginEmail').value.trim();
+    const senha = document.getElementById('loginSenha').value;
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Entrando...';
+    auth.signInWithEmailAndPassword(email, senha)
+      .catch(function(err){
+        mostrarErroLogin(MENSAGENS_ERRO[err.code] || 'Não foi possível entrar. Tente novamente.');
+      })
+      .finally(function(){
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Entrar';
+      });
+  });
+
+  document.getElementById('btnLogout').addEventListener('click', function(){
+    auth.signOut();
+  });
+
+  // Descobre se o usuário logado é admin, lendo o documento
+  // usuarios/{uid} no Firestore. O documento precisa ter o campo
+  // "admin" (checkbox/boolean) marcado como true. Quem não tem esse
+  // documento, ou tem admin desmarcado, só pode visualizar.
+  async function carregarPapel(uid){
+    try{
+      const snap = await db.collection('usuarios').doc(uid).get();
+      if(snap.exists && snap.data().admin === true) return true;
+    }catch(e){
+      console.error('Erro ao verificar permissão do usuário:', e);
+    }
+    return false;
+  }
+
+  let unsubscribePastas = null;
+  let unsubscribePlanilha = null;
+
+  function iniciarSincronizacaoPastas(){
+    if(unsubscribePastas) unsubscribePastas();
+    unsubscribePastas = PASTAS_DOC_REF.onSnapshot(function(snap){
+      pastas = snap.exists ? snap.data() : {};
+      computeMatches();
+      renderLibrary();
+    }, function(err){
+      console.error('Erro ao sincronizar pastas com o Firestore:', err);
+    });
+  }
+
+  // ---- Planilha enviada automaticamente pelo script SANSYS ----
+  // O script grava os cabeçalhos + metadados em ope0002_meta/current e as
+  // linhas em blocos (chunk_0, chunk_1, ...) na coleção ope0002_rows, pra
+  // não estourar o limite de tamanho de campo do Firestore. Aqui a gente
+  // escuta o documento de metadados; toda vez que ele muda, busca os
+  // blocos, remonta a planilha e processa como se fosse um upload manual.
+  const ROWS_COLLECTION = 'ope0002_rows';
+  const META_DOC_REF = db.collection('ope0002_meta').doc('current');
+
+  async function carregarPlanilhaDoFirestore(meta){
+    const snap = await db.collection(ROWS_COLLECTION).get();
+    const blocos = [];
+    snap.forEach(doc => blocos.push(doc.data()));
+    blocos.sort((a,b) => (a.index ?? 0) - (b.index ?? 0));
+
+    let linhasDados = [];
+    blocos.forEach(b => {
+      try{
+        const linhas = JSON.parse(b.rowsJson || '[]');
+        linhasDados = linhasDados.concat(linhas);
+      }catch(e){
+        console.error('Erro ao ler um bloco da planilha:', e);
+      }
+    });
+
+    const rows = [meta.headers || [], ...linhasDados];
+    return processarPlanilha(rows);
+  }
+
+  function iniciarSincronizacaoPlanilha(){
+    if(unsubscribePlanilha) unsubscribePlanilha();
+    unsubscribePlanilha = META_DOC_REF.onSnapshot(async function(snap){
+      if(!snap.exists){ return; }
+      const meta = snap.data();
+      try{
+        document.getElementById('statusDot').className = 'status-dot loading';
+        document.getElementById('statusText').textContent = 'Recebendo planilha automática...';
+        const dados = await carregarPlanilhaDoFirestore(meta);
+        DADOS_BRUTOS = dados;
+        const quando = meta.updatedAt && meta.updatedAt.toDate
+          ? meta.updatedAt.toDate().toLocaleString('pt-BR', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'})
+          : '';
+        ultimoUpload = { nome: meta.nomeOriginal || 'Envio automático', hora: quando };
+        computeMatches();
+        renderLibrary();
+      }catch(err){
+        console.error('Erro ao processar planilha recebida do Firestore:', err);
+        document.getElementById('errorBox').style.display = 'block';
+        document.getElementById('errorBox').textContent = 'Erro ao ler a planilha enviada automaticamente: ' + err.message;
+        updateStatusBar();
+      }
+    }, function(err){
+      console.error('Erro ao sincronizar planilha com o Firestore:', err);
+    });
+  }
+
+  auth.onAuthStateChanged(async function(user){
+    if(user){
+      loginScreen.style.display = 'none';
+      appShell.style.display = 'block';
+      isAdmin = await carregarPapel(user.uid);
+      headerRole.style.display = isAdmin ? 'none' : 'block';
+      iniciarSincronizacaoPastas();
+      iniciarSincronizacaoPlanilha();
+    } else {
+      if(unsubscribePastas){ unsubscribePastas(); unsubscribePastas = null; }
+      if(unsubscribePlanilha){ unsubscribePlanilha(); unsubscribePlanilha = null; }
+      isAdmin = false;
+      appShell.style.display = 'none';
+      loginScreen.style.display = 'flex';
+      loginForm.reset();
+    }
+  });
+
+</script>
+
+</body>
+</html>
