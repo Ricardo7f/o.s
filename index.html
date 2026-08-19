@@ -253,8 +253,46 @@
     background:var(--surface);border:1px solid var(--line);color:var(--primary-dark);font-weight:700;
     font-size:14px;padding:8px 13px;border-radius:10px;cursor:pointer;flex-shrink:0;
   }
-  .detalhe-titulo{font-size:17px;font-weight:600;color:var(--ink);line-height:1.25;}
+  .detalhe-titulo{font-size:17px;font-weight:600;color:var(--ink);line-height:1.25;flex:1;min-width:0;}
   .detalhe-sub{font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
+  .copy-btn{
+    background:var(--primary-soft);border:1px solid #C7E0D8;color:var(--primary-dark);font-weight:700;
+    font-size:12.5px;padding:8px 12px;border-radius:10px;cursor:pointer;flex-shrink:0;
+    display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit;
+  }
+  .copy-btn:active{background:var(--primary);color:#fff;}
+  .cidades-btn{
+    background:var(--surface);border:1px solid var(--line);color:var(--primary-dark);font-weight:700;
+    font-size:12.5px;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit;flex-shrink:0;
+    display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+  }
+  .cidades-btn:active{background:var(--primary-soft);}
+  .cidades-modal{max-width:420px;max-height:82vh;display:flex;flex-direction:column;}
+  .cidades-modal-body{overflow-y:auto;margin-top:10px;padding-right:2px;}
+  .cidades-total{font-size:12px;color:var(--ink-soft);margin-bottom:10px;}
+  .cidade-card{border:1px solid var(--line);border-radius:14px;margin-bottom:9px;overflow:hidden;}
+  .cidade-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 13px;cursor:pointer;}
+  .cidade-card-head:active{background:var(--primary-soft);}
+  .cidade-nome{font-weight:700;font-size:13.5px;color:var(--ink);}
+  .cidade-meta{display:flex;align-items:center;gap:8px;flex-shrink:0;}
+  .cidade-total-pill{font-size:11.5px;font-weight:700;color:var(--ink-soft);background:var(--bg);border-radius:100px;padding:3px 9px;}
+  .cidade-atraso-pill{font-size:11.5px;font-weight:700;color:var(--atrasado);background:var(--atrasado-soft);border-radius:100px;padding:3px 9px;}
+  .cidade-chevron{font-size:13px;color:var(--ink-faint);transition:transform .15s ease;}
+  .cidade-card.open .cidade-chevron{transform:rotate(90deg);}
+  .cidade-servicos{display:none;border-top:1px solid var(--line);background:var(--bg);}
+  .cidade-card.open .cidade-servicos{display:block;}
+  .cidade-servico-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 13px;font-size:12.5px;}
+  .cidade-servico-row+.cidade-servico-row{border-top:1px solid var(--line);}
+  .cidade-servico-nome{color:var(--ink);flex:1;min-width:0;}
+  .cidade-servico-qtd{color:var(--ink-soft);font-weight:700;flex-shrink:0;}
+  .cidade-servico-qtd b{color:var(--atrasado);}
+  .copy-toast{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(10px);
+    background:var(--primary-dark);color:#fff;font-size:13px;font-weight:600;padding:10px 18px;
+    border-radius:100px;box-shadow:0 4px 14px rgba(18,49,45,0.25);z-index:80;opacity:0;
+    pointer-events:none;transition:opacity .18s ease, transform .18s ease;
+  }
+  .copy-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px;}
   .stat{background:var(--surface);border-radius:14px;padding:12px 14px;border-left:5px solid var(--line);cursor:pointer;transition:transform .1s ease;}
@@ -429,6 +467,8 @@
     <div class="detalhe-header">
       <button class="btn-voltar" id="btnVoltar">‹ Serviços</button>
       <div class="detalhe-titulo" id="tituloServico"></div>
+      <button class="cidades-btn" id="btnPorCidade" title="Ver por cidade">🏙 Cidades</button>
+      <button class="copy-btn" id="btnCopiarOs" title="Copiar OS para WhatsApp">⧉ Copiar</button>
     </div>
 
     <div class="stat-grid" id="statGrid">
@@ -472,6 +512,32 @@
     </div>
   </div>
 </div>
+
+<div class="lib-modal-overlay" id="cidadesOverlay" style="display:none;">
+  <div class="lib-modal cidades-modal">
+    <div class="lib-modal-title plain">Distribuição por cidade</div>
+    <div class="cidades-total" id="cidadesTotalResumo"></div>
+    <div class="cidades-modal-body" id="cidadesModalBody"></div>
+    <div class="lib-modal-actions">
+      <button class="mini-btn" id="cidadesFechar">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="lib-modal-overlay" id="copyOsOverlay" style="display:none;">
+  <div class="lib-modal">
+    <div class="lib-modal-title plain">Copiar OS</div>
+    <p class="lib-modal-text">Você quer copiar apenas as OS <b>atrasadas</b> ou <b>todas</b> as OS deste serviço?</p>
+    <div class="lib-modal-actions" style="justify-content:space-between;">
+      <button class="mini-btn" id="copyOsCancel">Cancelar</button>
+      <div style="display:flex;gap:8px;">
+        <button class="mini-btn" id="copyOsTodas">Todas</button>
+        <button class="mini-btn dark" id="copyOsAtrasadas">Atrasadas</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="copy-toast" id="copyToast">OS copiadas!</div>
 
 <div class="lib-modal-overlay" id="libNewFolderOverlay" style="display:none;">
   <div class="lib-modal">
@@ -528,27 +594,37 @@ function parseData(v){
 
 function calcularDiasAtraso(dataVal, situacaoUpper){
   const d = parseData(dataVal);
-  if(!d) return {dias:0, status:'no-prazo'};
+  if(!d) return {dias:0, horas:0, status:'no-prazo'};
   const agora = new Date();
   const diffHoras = (d - agora) / 3600000;
-  let dias, status;
+  let dias, horas, status;
   if(diffHoras < 0){
-    const diasAtraso = Math.floor(Math.abs(diffHoras)/24);
-    dias = diasAtraso;
+    // totalHorasAtraso = quantidade de horas completas de atraso.
+    // dias = parte inteira em dias; horas = resto (0-23), usado quando
+    // o atraso é menor que 24h para não confundir "6 horas" com "6 dias".
+    const totalHorasAtraso = Math.floor(Math.abs(diffHoras));
+    dias = Math.floor(totalHorasAtraso / 24);
+    horas = totalHorasAtraso % 24;
     status = 'atrasado';
-    if(diasAtraso === 0) dias = Math.floor(Math.abs(diffHoras));
   } else if(diffHoras <= 24){
-    dias = 0; status = 'vence-hoje';
+    dias = 0; horas = 0; status = 'vence-hoje';
   } else if(diffHoras <= 48){
-    dias = 1; status = 'vence-1-dia';
+    dias = 1; horas = 0; status = 'vence-1-dia';
   } else {
     dias = Math.floor(diffHoras/24);
+    horas = 0;
     status = 'no-prazo';
   }
   if(situacaoUpper === 'PROGRAMADO' && status === 'atrasado'){
     status = 'no-prazo';
   }
-  return {dias, status};
+  return {dias, horas, status};
+}
+
+// Soma dias+horas em horas totais, para permitir ordenar corretamente
+// dois itens que empatam em "dias" mas têm horas de atraso diferentes.
+function horasTotaisAtraso(item){
+  return (item.dias||0) * 24 + (item.horas||0);
 }
 
 function fmtData(d){
@@ -599,9 +675,14 @@ function processarPlanilha(rows){
     const servicoDescricao = extrairDescricaoServico(servicoOriginal).trim();
     if(!cidade || !servicoDescricao) continue;
 
-    const { dias, status } = calcularDiasAtraso(row[colData], situacao);
-
-    resultado.push({
+    // IMPORTANTE: não calculamos "dias de atraso" / status aqui. Se
+    // calculássemos agora, o resultado ficaria congelado no instante do
+    // processamento (upload manual ou sincronização automática do SANSYS) e
+    // nunca mais seria atualizado enquanto a aba ficasse aberta. Em vez
+    // disso guardamos o valor bruto da data (dataRaw) e definimos "dias" e
+    // "status" como getters que recalculam a cada leitura, usando o
+    // relógio real no momento da exibição.
+    const item = {
       os: String(row[colOS] ?? ''),
       cidade,
       bairro: bairroCol>=0 ? String(row[bairroCol] ?? '').trim() : '',
@@ -613,8 +694,21 @@ function processarPlanilha(rows){
       parecerNaoExec: parecerNaoExecCol>=0 ? String(row[parecerNaoExecCol] ?? '').trim() : '',
       parecerSolic: parecerSolicCol>=0 ? String(row[parecerSolicCol] ?? '').trim() : '',
       dataFormatada: fmtData(parseData(row[colData])),
-      dias, status
+      dataRaw: row[colData]
+    };
+    Object.defineProperty(item, 'dias', {
+      enumerable: true,
+      get(){ return calcularDiasAtraso(item.dataRaw, item.situacao).dias; }
     });
+    Object.defineProperty(item, 'horas', {
+      enumerable: true,
+      get(){ return calcularDiasAtraso(item.dataRaw, item.situacao).horas; }
+    });
+    Object.defineProperty(item, 'status', {
+      enumerable: true,
+      get(){ return calcularDiasAtraso(item.dataRaw, item.situacao).status; }
+    });
+    resultado.push(item);
   }
   return resultado;
 }
@@ -1491,8 +1585,11 @@ function abrirPasta(folderId){
   DADOS = collectMatchesRecursive(folderId).slice();
   statusAtivo = null;
   servicoAtivo = null;
-  situacoesAtivas = [];
-  document.querySelectorAll('.filtro-situacao-btn').forEach(b => b.classList.remove('active'));
+  situacoesAtivas = ['PENDENTE', 'POSTERGADA'];
+  document.querySelectorAll('.filtro-situacao-btn').forEach(b => {
+    const ativo = situacoesAtivas.includes(b.dataset.situacao);
+    b.classList.toggle('active', ativo);
+  });
   document.getElementById('tituloPastaAberta').textContent = pastas[folderId] ? pastas[folderId].nome : '';
   document.getElementById('subPastaAberta').textContent = nomeCompletoPasta(folderId);
   document.getElementById('buscaServico').value = '';
@@ -1579,6 +1676,51 @@ function renderListaServicos(){
 }
 document.getElementById('buscaServico').addEventListener('input', renderListaServicos);
 
+// ---- Distribuição por cidade (dentro do serviço aberto) ----
+function construirEstatisticasCidade(){
+  const cidades = {};
+  dadosFiltradosPastaAberta()
+    .filter(d => d.servico === servicoAtivo)
+    .forEach(d=>{
+      const cid = d.cidade || '(sem cidade)';
+      cidades[cid] = (cidades[cid] || 0) + 1;
+    });
+  return cidades;
+}
+
+function renderCidadesModal(){
+  const cidades = construirEstatisticasCidade();
+  const nomes = Object.keys(cidades).sort((a,b)=> cidades[b] - cidades[a]);
+  const totalGeral = nomes.reduce((s,n)=> s + cidades[n], 0);
+
+  document.getElementById('cidadesTotalResumo').textContent =
+    `${totalGeral} OS distribuídas em ${nomes.length} cidade${nomes.length!==1?'s':''}`;
+
+  const body = document.getElementById('cidadesModalBody');
+  if(!nomes.length){
+    body.innerHTML = '<div class="empty">Nenhuma OS encontrada com os filtros atuais.</div>';
+    return;
+  }
+
+  body.innerHTML = nomes.map(cid => `
+      <div class="cidade-card">
+        <div class="cidade-card-head">
+          <div class="cidade-nome">${escapeHtml(cid)}</div>
+          <span class="cidade-total-pill">${cidades[cid]} OS</span>
+        </div>
+      </div>`).join('');
+}
+
+const cidadesOverlay = document.getElementById('cidadesOverlay');
+document.getElementById('btnPorCidade').addEventListener('click', () => {
+  if(!servicoAtivo) return;
+  renderCidadesModal();
+  cidadesOverlay.style.display = 'flex';
+});
+function closeCidadesModal(){ cidadesOverlay.style.display = 'none'; }
+document.getElementById('cidadesFechar').addEventListener('click', closeCidadesModal);
+cidadesOverlay.addEventListener('click', (e) => { if(e.target === cidadesOverlay) closeCidadesModal(); });
+
 document.querySelectorAll('.filtro-situacao-btn').forEach(btn => {
   btn.addEventListener('click', function(){
     const s = this.dataset.situacao;
@@ -1620,6 +1762,89 @@ function abrirServico(nome){
   window.scrollTo(0,0);
 }
 document.getElementById('btnVoltar').addEventListener('click', mostrarViewServicos);
+
+// ---- Copiar OS para WhatsApp ----
+function linhaOs(d){
+  const local = d.cidade;
+  let sufixo = '';
+  if(d.status === 'atrasado'){
+    if(d.dias === 0){
+      sufixo = d.horas === 0 ? 'atrasada há menos de 1 hora' : `atrasada há ${d.horas} hora${d.horas>1?'s':''}`;
+    } else {
+      sufixo = `${d.dias} dia${d.dias>1?'s':''} de atraso`;
+    }
+  } else if(d.status === 'vence-hoje'){
+    sufixo = 'vence hoje';
+  } else if(d.status === 'vence-1-dia'){
+    sufixo = 'vence em 1 dia';
+  } else {
+    sufixo = `no prazo (${d.dias} dia${d.dias!==1?'s':''})`;
+  }
+  return `${d.os} - ${local} - ${sufixo}`;
+}
+
+function gerarTextoOs(apenasAtrasadas){
+  let itens = dadosFiltradosPastaAberta().filter(d => d.servico === servicoAtivo);
+  if(apenasAtrasadas) itens = itens.filter(d => d.status === 'atrasado');
+  itens = itens.slice().sort((a,b)=>{
+    const oa = ORDEM_STATUS[a.status], ob = ORDEM_STATUS[b.status];
+    if(oa !== ob) return oa - ob;
+    return horasTotaisAtraso(b) - horasTotaisAtraso(a);
+  });
+  const linhas = itens.map(linhaOs);
+  return { texto: `${servicoAtivo}\n\n` + linhas.join('\n'), qtd: linhas.length };
+}
+
+function copiarTexto(texto){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(texto).catch(()=>copiarTextoFallback(texto));
+  } else {
+    copiarTextoFallback(texto);
+  }
+}
+function copiarTextoFallback(texto){
+  const ta = document.createElement('textarea');
+  ta.value = texto;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try{ document.execCommand('copy'); }catch(e){}
+  document.body.removeChild(ta);
+}
+
+let copyToastTimer = null;
+function mostrarCopyToast(msg){
+  const t = document.getElementById('copyToast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(copyToastTimer);
+  copyToastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+const copyOsOverlay = document.getElementById('copyOsOverlay');
+document.getElementById('btnCopiarOs').addEventListener('click', () => {
+  if(!servicoAtivo) return;
+  copyOsOverlay.style.display = 'flex';
+});
+function closeCopyOsModal(){ copyOsOverlay.style.display = 'none'; }
+document.getElementById('copyOsCancel').addEventListener('click', closeCopyOsModal);
+copyOsOverlay.addEventListener('click', (e) => { if(e.target === copyOsOverlay) closeCopyOsModal(); });
+
+document.getElementById('copyOsAtrasadas').addEventListener('click', () => {
+  const { texto, qtd } = gerarTextoOs(true);
+  closeCopyOsModal();
+  if(qtd === 0){ mostrarCopyToast('Nenhuma OS atrasada para copiar'); return; }
+  copiarTexto(texto);
+  mostrarCopyToast(`${qtd} OS atrasada${qtd>1?'s':''} copiada${qtd>1?'s':''}!`);
+});
+document.getElementById('copyOsTodas').addEventListener('click', () => {
+  const { texto, qtd } = gerarTextoOs(false);
+  closeCopyOsModal();
+  if(qtd === 0){ mostrarCopyToast('Nenhuma OS para copiar'); return; }
+  copiarTexto(texto);
+  mostrarCopyToast(`${qtd} OS copiada${qtd>1?'s':''}!`);
+});
 
 function atualizarContadoresServico(){
   const itens = dadosFiltradosPastaAberta().filter(d=>d.servico === servicoAtivo);
@@ -1667,7 +1892,7 @@ function aplicarFiltros(){
   filtrados.sort((a,b)=>{
     const oa = ORDEM_STATUS[a.status], ob = ORDEM_STATUS[b.status];
     if(oa !== ob) return oa - ob;
-    return b.dias - a.dias;
+    return horasTotaisAtraso(b) - horasTotaisAtraso(a);
   });
 
   document.getElementById('resultCount').textContent = `${filtrados.length} OS encontradas`;
@@ -1684,7 +1909,9 @@ function renderLista(lista){
   }
   cont.innerHTML = lista.map((d, i)=>{
     const diasLabel = d.status==='atrasado'
-      ? (d.dias===0 ? 'há poucas horas' : `há ${d.dias} dia${d.dias>1?'s':''}`)
+      ? (d.dias===0
+          ? (d.horas===0 ? 'há menos de 1 hora' : `há ${d.horas} hora${d.horas>1?'s':''}`)
+          : `há ${d.dias} dia${d.dias>1?'s':''}`)
       : (d.status==='no-prazo' ? `em ${d.dias} dia${d.dias!==1?'s':''}` : '');
     return `
     <div class="card st-${d.status}">
