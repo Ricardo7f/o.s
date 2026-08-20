@@ -214,45 +214,88 @@
   .lib-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
 
   /* ---- Reaproveitado do painel original ---- */
-  .gauge-card{background:var(--surface);border-radius:18px;padding:16px;display:flex;align-items:center;gap:16px;box-shadow:0 1px 3px rgba(18,49,45,0.06);margin-bottom:14px;}
-  .gauge-card svg{flex-shrink:0;}
-  .gauge-text .num{font-size:34px;font-weight:700;line-height:1;color:var(--atrasado);}
-  .gauge-text .label{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
-  .gauge-text .total{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .gauge-card{
+    background:var(--surface);border-radius:20px;padding:18px 20px;display:flex;align-items:center;gap:18px;
+    box-shadow:0 1px 2px rgba(18,49,45,0.04),0 6px 18px -8px rgba(18,49,45,0.12);margin-bottom:14px;
+    border:1px solid var(--line);position:relative;overflow:hidden;
+  }
+  .gauge-card::before{
+    content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;
+    background:radial-gradient(circle,var(--atrasado-soft) 0%,transparent 70%);opacity:0.7;pointer-events:none;
+  }
+  .gauge-card svg{flex-shrink:0;filter:drop-shadow(0 2px 4px rgba(193,68,59,0.18));position:relative;}
+  .gauge-text{position:relative;}
+  .gauge-text .num{font-family:'Barlow Condensed',sans-serif;font-size:38px;font-weight:700;line-height:1;color:var(--atrasado);letter-spacing:0.2px;}
+  .gauge-text .label{font-size:12.5px;color:var(--ink-soft);margin-top:4px;line-height:1.35;max-width:190px;}
+  .gauge-text .total{font-size:11.5px;color:var(--ink-faint);margin-top:7px;font-weight:600;display:inline-flex;align-items:center;gap:5px;background:var(--bg);padding:4px 10px;border-radius:100px;}
 
   .filtro-situacao{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
   .filtro-situacao-btn{
-    flex:1;min-width:0;padding:9px 6px;border-radius:12px;border:1.5px solid var(--line);
-    background:var(--surface);color:var(--ink-soft);font-size:12px;font-weight:700;
+    flex:1;min-width:0;padding:10px 8px;border-radius:100px;border:1.5px solid var(--line);
+    background:var(--surface);color:var(--ink-soft);font-size:12.5px;font-weight:700;
     font-family:inherit;cursor:pointer;text-align:center;white-space:nowrap;overflow:hidden;
-    text-overflow:ellipsis;transition:all .12s ease;
+    text-overflow:ellipsis;transition:all .14s ease;
   }
-  .filtro-situacao-btn:active{transform:scale(0.97);}
-  .filtro-situacao-btn.active{background:var(--primary);border-color:var(--primary);color:#fff;}
+  .filtro-situacao-btn:active{transform:scale(0.96);}
+  .filtro-situacao-btn.active{
+    background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-color:var(--primary-dark);
+    color:#fff;box-shadow:0 3px 10px -3px rgba(14,92,86,0.45);
+  }
 
+  .busca-wrap{position:relative;margin-top:14px;}
+  .busca-wrap svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--ink-faint);pointer-events:none;}
   input.busca-top{
-    width:100%;margin-top:14px;padding:11px 12px;border-radius:12px;border:1px solid var(--line);
+    width:100%;padding:11px 12px 11px 38px;border-radius:14px;border:1px solid var(--line);
     background:var(--surface);font-size:14px;font-family:inherit;color:var(--ink);
   }
+  input.busca-top:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
   .grupo-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:20px 4px 8px;}
   .servico-card{
-    background:var(--surface);border-radius:14px;padding:13px 14px;margin-bottom:9px;display:flex;
-    justify-content:space-between;align-items:center;gap:10px;cursor:pointer;box-shadow:0 1px 2px rgba(18,49,45,0.05);
-    border-left:5px solid var(--line);
+    background:var(--surface);border-radius:16px;padding:14px 15px 14px 18px;margin-bottom:9px;display:flex;
+    flex-direction:column;align-items:stretch;gap:0;cursor:pointer;position:relative;overflow:hidden;
+    border:1px solid var(--line);box-shadow:0 1px 2px rgba(18,49,45,0.04),0 4px 12px -6px rgba(18,49,45,0.1);
+    transition:box-shadow .16s ease,transform .12s ease;
   }
-  .servico-card:active{transform:scale(0.98);}
-  .servico-card.tem-atraso{border-color:var(--atrasado);}
+  .servico-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line);}
+  .servico-card.tem-atraso::before{background:linear-gradient(180deg,#CC4C42,var(--atrasado));}
+  .servico-card:active{transform:scale(0.985);}
+  .servico-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
   .servico-nome{font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3;}
   .servico-total{font-size:12px;color:var(--ink-soft);margin-top:3px;}
-  .servico-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;}
-  .pill{font-size:11px;font-weight:700;color:#fff;background:var(--atrasado);padding:3px 9px;border-radius:20px;white-space:nowrap;}
-  .chevron{color:var(--ink-soft);font-size:18px;line-height:1;}
+  .servico-right{display:flex;align-items:center;gap:9px;flex-shrink:0;}
 
-  .detalhe-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  /* ---- Mini gráfico: Pendente / Postergada / Programado ---- */
+  .servico-breakdown{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);}
+  .sb-stack{
+    display:flex;width:100%;height:8px;border-radius:100px;overflow:hidden;background:var(--bg);
+  }
+  .sb-seg{display:block;height:100%;min-width:0;}
+  .sb-seg.pendente{background:linear-gradient(90deg,var(--primary),var(--primary-dark));}
+  .sb-seg.postergada{background:linear-gradient(90deg,#F0B455,#C98A1F);}
+  .sb-seg.programado{background:linear-gradient(90deg,#6BAEDA,var(--um-dia));}
+  .sb-seg+.sb-seg{box-shadow:-1px 0 0 rgba(255,255,255,0.6);}
+  .sb-legend{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:9px;}
+  .sb-item{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
+  .sb-item b{color:var(--ink);font-weight:700;margin-left:1px;font-variant-numeric:tabular-nums;}
+  .sb-dot{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+  .sb-dot.pendente{background:var(--primary);}
+  .sb-dot.postergada{background:var(--hoje);}
+  .sb-dot.programado{background:var(--um-dia);}
+  .pill{
+    font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#CC4C42,var(--atrasado) 70%,#A8362E);
+    padding:5px 11px;border-radius:100px;white-space:nowrap;box-shadow:0 2px 6px -2px rgba(193,68,59,0.5);
+  }
+  .chevron{
+    color:var(--ink-faint);font-size:16px;line-height:1;flex-shrink:0;width:26px;height:26px;border-radius:50%;
+    background:var(--bg);display:inline-flex;align-items:center;justify-content:center;
+  }
+
+  .detalhe-header{display:flex;align-items:center;gap:8px;margin-bottom:0;}
   .btn-voltar{
     background:var(--surface);border:1px solid var(--line);color:var(--primary-dark);font-weight:700;
     font-size:14px;padding:8px 13px;border-radius:10px;cursor:pointer;flex-shrink:0;
   }
+  .detalhe-header-spacer{flex:1;min-width:0;}
   .detalhe-titulo{font-size:17px;font-weight:600;color:var(--ink);line-height:1.25;flex:1;min-width:0;}
   .detalhe-sub{font-size:12px;color:var(--ink-soft);margin:2px 0 0;}
   .copy-btn{
@@ -267,6 +310,33 @@
     display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
   }
   .cidades-btn:active{background:var(--primary-soft);}
+  .cidades-btn.icon-only,.copy-btn.icon-only{
+    width:38px;height:38px;padding:0;justify-content:center;align-items:center;font-size:17px;
+  }
+  .detalhe-linha{height:3px;background:linear-gradient(90deg,var(--atrasado),#A8362E);border-radius:3px;margin:12px 0 14px;flex-shrink:0;}
+  .detalhe-titulo-desc{
+    font-family:'Barlow Condensed',sans-serif;font-size:19px;font-weight:600;color:var(--ink);
+    line-height:1.28;margin-bottom:14px;
+  }
+
+  /* ---- Motivos de não execução ---- */
+  .motivo-section{margin:14px 0 16px;}
+  .motivo-heading{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:0 0 8px 2px;}
+  .motivo-list{display:flex;flex-direction:column;gap:7px;}
+  .motivo-item{
+    display:flex;align-items:center;justify-content:space-between;gap:10px;
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:10px 13px;cursor:pointer;font-size:13px;color:var(--ink);
+    transition:background .12s ease,border-color .12s ease;
+  }
+  .motivo-item:active{transform:scale(0.98);}
+  .motivo-item.active{background:var(--primary-soft);border-color:var(--primary);}
+  .motivo-item .motivo-nome{flex:1;min-width:0;line-height:1.35;}
+  .motivo-item .motivo-count{
+    flex-shrink:0;font-weight:700;font-size:12px;color:var(--ink-soft);
+    background:var(--bg);border-radius:100px;padding:3px 10px;
+  }
+  .motivo-item.active .motivo-count{background:var(--primary);color:#fff;}
   .cidades-modal{max-width:420px;max-height:82vh;display:flex;flex-direction:column;}
   .cidades-modal-body{overflow-y:auto;margin-top:10px;padding-right:2px;}
   .cidades-total{font-size:12px;color:var(--ink-soft);margin-bottom:10px;}
@@ -316,24 +386,65 @@
   }
   #resultCount{margin:14px 2px 8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
 
-  .card{background:var(--surface);border-radius:14px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 2px rgba(18,49,45,0.05);border-left:5px solid var(--line);}
-  .card.st-atrasado{border-color:var(--atrasado);}
-  .card.st-vence-hoje{border-color:var(--hoje);}
-  .card.st-vence-1-dia{border-color:var(--um-dia);}
-  .card.st-no-prazo{border-color:var(--no-prazo);}
-  .card-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;cursor:pointer;}
+  .card{
+    background:var(--surface);border-radius:18px;margin-bottom:12px;overflow:hidden;
+    position:relative;border:1px solid var(--line);
+    box-shadow:0 1px 2px rgba(18,49,45,0.04),0 6px 16px -8px rgba(18,49,45,0.12);
+    transition:box-shadow .18s ease,transform .12s ease;
+  }
+  .card:active{transform:scale(0.988);}
+  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line);border-radius:4px 0 0 4px;}
+  .card.st-atrasado::before{background:linear-gradient(180deg,var(--atrasado),#A8362E);}
+  .card.st-vence-hoje::before{background:var(--hoje);}
+  .card.st-vence-1-dia::before{background:var(--um-dia);}
+  .card.st-no-prazo::before{background:var(--no-prazo);}
+  .card-head{padding:14px 16px 10px 19px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;cursor:pointer;}
   .card-head .left{min-width:0;}
-  .card-os{font-size:12px;color:var(--ink-soft);font-weight:600;}
-  .card-local{font-size:12.5px;color:var(--ink-soft);margin-top:3px;}
-  .badge{flex-shrink:0;font-size:11px;font-weight:700;padding:5px 9px;border-radius:20px;color:#fff;white-space:nowrap;text-align:center;}
-  .badge.st-atrasado{background:var(--atrasado);}
-  .badge.st-vence-hoje{background:var(--hoje);color:#3A2604;}
-  .badge.st-vence-1-dia{background:var(--um-dia);}
-  .badge.st-no-prazo{background:var(--no-prazo);}
-  .card-body{display:none;padding:0 14px 14px;font-size:13px;color:var(--ink-soft);border-top:1px solid var(--line);margin-top:2px;padding-top:10px;}
-  .card-body.open{display:block;}
-  .card-body div{margin-bottom:6px;line-height:1.4;}
-  .card-body b{color:var(--ink);font-weight:600;}
+  .card-os{font-size:10.5px;color:var(--ink-faint);font-weight:700;letter-spacing:0.6px;text-transform:uppercase;}
+  .card-local{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:var(--ink);margin-top:3px;line-height:1.22;}
+  .badge{
+    flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;padding:7px 13px;border-radius:13px;color:#fff;
+    white-space:nowrap;text-align:center;letter-spacing:0.2px;
+    box-shadow:0 3px 8px -2px rgba(0,0,0,0.18);
+  }
+  .badge .badge-days{display:block;font-size:9.5px;font-weight:600;opacity:0.88;margin-top:2px;letter-spacing:0.1px;text-transform:none;}
+  .badge.st-atrasado{background:linear-gradient(135deg,#CC4C42,var(--atrasado) 65%,#A8362E);}
+  .badge.st-vence-hoje{background:linear-gradient(135deg,#F0B455,var(--hoje));color:#3A2604;}
+  .badge.st-vence-1-dia{background:linear-gradient(135deg,#5E9FCB,var(--um-dia));}
+  .badge.st-no-prazo{background:linear-gradient(135deg,#4FA173,var(--no-prazo));}
+
+  /* ---- Resumo rápido (sempre visível, sem legendas) ---- */
+  .card-quick{padding:0 16px 14px 19px;display:flex;flex-direction:column;gap:10px;}
+  .card-quick-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .card-matricula{
+    display:inline-flex;align-items:center;gap:6px;
+    font-family:'Barlow Condensed',sans-serif;font-size:16.5px;font-weight:700;
+    color:var(--ink);letter-spacing:0.2px;
+    background:var(--bg);border:1px solid var(--line);
+    padding:5px 12px 5px 9px;border-radius:100px;
+  }
+  .card-matricula svg{flex-shrink:0;color:var(--primary);}
+  .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:5px 11px;border-radius:100px;white-space:nowrap;letter-spacing:0.1px;}
+  .pill-cancelada{background:var(--atrasado-soft);color:var(--atrasado);}
+  .pill-ativa{background:#E1F3E8;color:var(--no-prazo);}
+  .pill-suspensa{background:#FDF1DE;color:#9C6A17;}
+  .pill-neutra{background:var(--primary-soft);color:var(--primary-dark);}
+  .pill-pendente{background:var(--primary-soft);color:var(--primary-dark);}
+  .pill-postergada{background:#FDF1DE;color:#9C6A17;}
+  .pill-programado{background:#E7F0FA;color:var(--um-dia);}
+  .card-motivo{
+    font-size:12.5px;color:var(--ink-soft);line-height:1.45;display:flex;gap:7px;align-items:flex-start;
+    background:var(--bg);border-radius:11px;padding:8px 10px;
+  }
+  .card-motivo svg{flex-shrink:0;margin-top:1px;color:var(--accent);}
+
+  .card-body{display:none;padding:11px 16px 15px 19px;font-size:13px;color:var(--ink-soft);border-top:1px dashed var(--line);margin-top:2px;}
+  .card-body.open{display:block;animation:cardBodyIn .16s ease;}
+  @keyframes cardBodyIn{from{opacity:0;transform:translateY(-2px);}to{opacity:1;transform:translateY(0);}}
+  .card-body div{margin-bottom:7px;line-height:1.45;display:flex;gap:8px;justify-content:space-between;}
+  .card-body div:last-child{margin-bottom:0;}
+  .card-body b{color:var(--ink);font-weight:600;flex-shrink:0;}
 
   .empty{text-align:center;padding:32px 20px;color:var(--ink-soft);font-size:13.5px;}
 
@@ -458,7 +569,10 @@
       <button type="button" class="filtro-situacao-btn" data-situacao="POSTERGADA">Postergada</button>
       <button type="button" class="filtro-situacao-btn" data-situacao="PROGRAMADO">Programado</button>
     </div>
-    <input type="text" class="busca-top" id="buscaServico" placeholder="Buscar serviço...">
+    <div class="busca-wrap">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" class="busca-top" id="buscaServico" placeholder="Buscar serviço...">
+    </div>
     <div id="listaServicos"></div>
   </div>
 
@@ -466,10 +580,12 @@
   <div id="viewDetalhe">
     <div class="detalhe-header">
       <button class="btn-voltar" id="btnVoltar">‹ Serviços</button>
-      <div class="detalhe-titulo" id="tituloServico"></div>
-      <button class="cidades-btn" id="btnPorCidade" title="Ver por cidade">🏙 Cidades</button>
-      <button class="copy-btn" id="btnCopiarOs" title="Copiar OS para WhatsApp">⧉ Copiar</button>
+      <div class="detalhe-header-spacer"></div>
+      <button class="cidades-btn icon-only" id="btnPorCidade" title="Ver por cidade">🏙</button>
+      <button class="copy-btn icon-only" id="btnCopiarOs" title="Copiar OS para WhatsApp">⧉</button>
     </div>
+    <div class="detalhe-linha"></div>
+    <div class="detalhe-titulo-desc" id="tituloServico"></div>
 
     <div class="stat-grid" id="statGrid">
       <div class="stat st-atrasado" data-status="atrasado">
@@ -488,6 +604,11 @@
         <div class="num" id="c-no-prazo">0</div>
         <div class="lbl">No prazo</div>
       </div>
+    </div>
+
+    <div class="motivo-section" id="motivoSection" style="display:none;">
+      <div class="motivo-heading">Motivos de não execução</div>
+      <div class="motivo-list" id="motivoList"></div>
     </div>
 
     <div class="filters">
@@ -1557,6 +1678,7 @@ function renderLibrary(){
 let DADOS = [];
 let statusAtivo = null;
 let servicoAtivo = null;
+let motivoAtivo = null;
 let pastaAbertaId = null;
 let situacoesAtivas = []; // filtro multi-seleção: PENDENTE / POSTERGADA / PROGRAMADO (vazio = todas)
 
@@ -1627,11 +1749,15 @@ function desenharGauge(pct){
   const svg = document.getElementById('gaugeSvg');
   const r = 36, cx=43, cy=43, circ = 2*Math.PI*r;
   const offset = circ * (1 - pct/100);
+  let cor = 'var(--no-prazo)';
+  if(pct >= 60) cor = 'var(--atrasado)';
+  else if(pct >= 30) cor = 'var(--hoje)';
   svg.innerHTML = `
     <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E4EBE8" stroke-width="9"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--atrasado)" stroke-width="9"
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${cor}" stroke-width="9"
       stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
-      transform="rotate(-90 ${cx} ${cy})"/>`;
+      transform="rotate(-90 ${cx} ${cy})" style="transition:stroke-dashoffset .4s ease"/>`;
+  document.getElementById('pctAtrasado').style.color = cor;
 }
 
 // Estatísticas por serviço, dentro da pasta aberta (sem os grupos fixos de
@@ -1639,9 +1765,10 @@ function desenharGauge(pct){
 function construirEstatisticasServico(){
   const grupos = {};
   dadosFiltradosPastaAberta().forEach(d=>{
-    if(!grupos[d.servico]) grupos[d.servico] = {total:0, atrasadas:0};
+    if(!grupos[d.servico]) grupos[d.servico] = {total:0, atrasadas:0, PENDENTE:0, POSTERGADA:0, PROGRAMADO:0};
     grupos[d.servico].total++;
     if(d.status === 'atrasado') grupos[d.servico].atrasadas++;
+    if(grupos[d.servico][d.situacao] !== undefined) grupos[d.servico][d.situacao]++;
   });
   return grupos;
 }
@@ -1659,15 +1786,33 @@ function renderListaServicos(){
   nomes.forEach(nome=>{
     const st = grupos[nome];
     const temAtraso = st.atrasadas > 0;
+    const total = st.total || 0;
+    const pend = st.PENDENTE || 0, post = st.POSTERGADA || 0, prog = st.PROGRAMADO || 0;
+    // Segmentos da barra empilhada = proporção exata de cada situação no total.
+    const seg = n => total ? (n/total*100).toFixed(2) : 0;
     html += `
       <div class="servico-card ${temAtraso?'tem-atraso':''}" onclick="abrirServico('${nome.replace(/'/g,"\\'")}')">
-        <div>
-          <div class="servico-nome">${escapeHtml(nome)}</div>
-          <div class="servico-total">${st.total} OS</div>
+        <div class="servico-top">
+          <div>
+            <div class="servico-nome">${escapeHtml(nome)}</div>
+            <div class="servico-total">${st.total} OS</div>
+          </div>
+          <div class="servico-right">
+            ${temAtraso ? `<span class="pill">${st.atrasadas} atrasada${st.atrasadas>1?'s':''}</span>` : ''}
+            <span class="chevron"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
+          </div>
         </div>
-        <div class="servico-right">
-          ${temAtraso ? `<span class="pill">${st.atrasadas} atrasada${st.atrasadas>1?'s':''}</span>` : ''}
-          <span class="chevron">›</span>
+        <div class="servico-breakdown">
+          <div class="sb-stack">
+            ${pend > 0 ? `<span class="sb-seg pendente" style="width:${seg(pend)}%"></span>` : ''}
+            ${post > 0 ? `<span class="sb-seg postergada" style="width:${seg(post)}%"></span>` : ''}
+            ${prog > 0 ? `<span class="sb-seg programado" style="width:${seg(prog)}%"></span>` : ''}
+          </div>
+          <div class="sb-legend">
+            <span class="sb-item"><span class="sb-dot pendente"></span>Pendente <b>${pend}</b></span>
+            <span class="sb-item"><span class="sb-dot postergada"></span>Postergada <b>${post}</b></span>
+            <span class="sb-item"><span class="sb-dot programado"></span>Programado <b>${prog}</b></span>
+          </div>
         </div>
       </div>`;
   });
@@ -1752,14 +1897,66 @@ function mostrarViewDetalhe(){
 function abrirServico(nome){
   servicoAtivo = nome;
   statusAtivo = null;
+  motivoAtivo = null;
   document.getElementById('busca').value = '';
-  document.getElementById('filtroCidade').value = '';
+
+  // Dropdown de cidades mostra só as cidades que têm OS deste serviço
+  // (dentro da pasta aberta), não todas as cidades da pasta inteira.
+  const cidadesDoServico = [...new Set(
+    dadosFiltradosPastaAberta().filter(d => d.servico === nome).map(d => d.cidade)
+  )].sort();
+  const selCidade = document.getElementById('filtroCidade');
+  selCidade.innerHTML = '<option value="">Todas as cidades</option>' +
+    cidadesDoServico.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  selCidade.value = '';
+
   document.getElementById('tituloServico').textContent = nome;
   document.querySelectorAll('.stat').forEach(x=>x.classList.remove('active'));
   atualizarContadoresServico();
+  renderMotivos();
   aplicarFiltros();
   mostrarViewDetalhe();
   window.scrollTo(0,0);
+}
+
+// ---- Motivos de não execução (dentro do serviço aberto) ----
+function construirEstatisticasMotivo(){
+  const mapa = {};
+  dadosFiltradosPastaAberta()
+    .filter(d => d.servico === servicoAtivo)
+    .forEach(d=>{
+      const m = (d.motivo || '').trim();
+      if(!m) return;
+      mapa[m] = (mapa[m] || 0) + 1;
+    });
+  return mapa;
+}
+
+function renderMotivos(){
+  const mapa = construirEstatisticasMotivo();
+  const nomes = Object.keys(mapa).sort((a,b)=> mapa[b]-mapa[a]);
+  const section = document.getElementById('motivoSection');
+  const list = document.getElementById('motivoList');
+  if(!nomes.length){
+    section.style.display = 'none';
+    list.innerHTML = '';
+    if(motivoAtivo){ motivoAtivo = null; }
+    return;
+  }
+  section.style.display = 'block';
+  list.innerHTML = nomes.map(nome => `
+      <div class="motivo-item ${motivoAtivo===nome ? 'active' : ''}" data-motivo="${escapeHtml(nome)}">
+        <span class="motivo-nome">${escapeHtml(nome)}</span>
+        <span class="motivo-count">${mapa[nome]}</span>
+      </div>`).join('');
+  list.querySelectorAll('.motivo-item').forEach(el => {
+    el.addEventListener('click', () => {
+      const m = el.dataset.motivo;
+      motivoAtivo = (motivoAtivo === m) ? null : m;
+      renderMotivos();
+      aplicarFiltros();
+    });
+  });
 }
 document.getElementById('btnVoltar').addEventListener('click', mostrarViewServicos);
 
@@ -1881,6 +2078,7 @@ function aplicarFiltros(){
   let filtrados = dadosFiltradosPastaAberta().filter(d=>{
     if(d.servico !== servicoAtivo) return false;
     if(statusAtivo && d.status !== statusAtivo) return false;
+    if(motivoAtivo && (d.motivo||'').trim() !== motivoAtivo) return false;
     if(cidade && d.cidade !== cidade) return false;
     if(busca){
       const alvo = semAcento(`${d.os} ${d.matricula} ${d.bairro} ${d.cidade}`);
@@ -1901,6 +2099,26 @@ function aplicarFiltros(){
 
 const LABEL_STATUS = {'atrasado':'ATRASADA','vence-hoje':'VENCE HOJE','vence-1-dia':'VENCE EM 1 DIA','no-prazo':'NO PRAZO'};
 
+// Cor do "pill" da situação da matrícula (Cancelada, Ativa, Suspensa etc.)
+function pillClasseMatricula(valor){
+  const v = semAcento(valor || '').toUpperCase();
+  if(v.includes('CANCEL')) return 'pill-cancelada';
+  if(v.includes('SUSPEN') || v.includes('CORT')) return 'pill-suspensa';
+  if(v.includes('ATIV') || v.includes('NORMAL') || v.includes('LIGAD')) return 'pill-ativa';
+  return 'pill-neutra';
+}
+
+// Cor do "pill" da situação da OS (Pendente, Postergada, Programado)
+function pillClasseSituacao(valor){
+  const v = semAcento(valor || '').toUpperCase();
+  if(v === 'POSTERGADA') return 'pill-postergada';
+  if(v === 'PROGRAMADO') return 'pill-programado';
+  return 'pill-pendente';
+}
+
+const ICO_MATRICULA = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>';
+const ICO_MOTIVO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
+
 function renderLista(lista){
   const cont = document.getElementById('lista');
   if(lista.length === 0){
@@ -1920,11 +2138,19 @@ function renderLista(lista){
           <div class="card-os">OS ${escapeHtml(d.os)}</div>
           <div class="card-local">${escapeHtml(d.cidade)}${d.bairro ? ' — ' + escapeHtml(d.bairro) : ''}</div>
         </div>
-        <div class="badge st-${d.status}">${LABEL_STATUS[d.status]}${diasLabel ? '<br>'+diasLabel : ''}</div>
+        <div class="badge st-${d.status}">${LABEL_STATUS[d.status]}${diasLabel ? `<span class="badge-days">${diasLabel}</span>` : ''}</div>
+      </div>
+      <div class="card-quick" onclick="toggleCard(${i})">
+        <div class="card-quick-row">
+          ${d.matricula ? `<span class="card-matricula">${ICO_MATRICULA}${escapeHtml(d.matricula)}</span>` : ''}
+          ${d.situacaoOS ? `<span class="pill ${pillClasseMatricula(d.situacaoOS)}">${escapeHtml(d.situacaoOS)}</span>` : ''}
+          ${d.situacao ? `<span class="pill ${pillClasseSituacao(d.situacao)}">${escapeHtml(d.situacao)}</span>` : ''}
+        </div>
+        ${d.motivo ? `<div class="card-motivo">${ICO_MOTIVO}<span>${escapeHtml(d.motivo)}</span></div>` : ''}
       </div>
       <div class="card-body" id="body-${i}">
         <div><b>Matrícula:</b> ${escapeHtml(d.matricula || '—')}</div>
-        <div><b>Situação OS:</b> ${escapeHtml(d.situacaoOS || '—')}</div>
+        <div><b>Situação da Matrícula:</b> ${escapeHtml(d.situacaoOS || '—')}</div>
         <div><b>Situação:</b> ${escapeHtml(d.situacao || '—')}</div>
         <div><b>Prazo:</b> ${escapeHtml(d.dataFormatada || '—')}</div>
         <div><b>Motivo não execução:</b> ${escapeHtml(d.motivo || '—')}</div>
