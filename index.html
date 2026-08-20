@@ -384,7 +384,17 @@
     width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--surface);
     font-size:14px;font-family:inherit;color:var(--ink);
   }
-  #resultCount{margin:14px 2px 8px;font-size:12.5px;color:var(--ink-soft);font-weight:600;}
+  #resultCount{font-size:12.5px;color:var(--ink-soft);font-weight:600;}
+  .result-bar{margin:14px 2px 8px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .sort-btn{
+    display:inline-flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--line);
+    color:var(--ink-soft);width:30px;height:30px;padding:0;
+    border-radius:100px;cursor:pointer;flex-shrink:0;
+  }
+  .sort-btn:active{background:var(--primary-soft);}
+  .sort-btn.active{background:var(--primary-soft);border-color:#C7E0D8;color:var(--primary-dark);}
+  .sort-btn svg{transition:transform .15s ease;}
+  .sort-btn.reversed svg{transform:rotate(180deg);}
 
   .card{
     background:var(--surface);border-radius:18px;margin-bottom:12px;overflow:hidden;
@@ -415,16 +425,16 @@
   .badge.st-no-prazo{background:linear-gradient(135deg,#4FA173,var(--no-prazo));}
 
   /* ---- Resumo rápido (sempre visível, sem legendas) ---- */
-  .card-quick{padding:0 16px 14px 19px;display:flex;flex-direction:column;gap:10px;}
-  .card-quick-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .card-quick{padding:0 16px 14px 19px;display:flex;flex-direction:column;gap:9px;}
+  .card-quick-row{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;}
   .card-matricula{
-    display:inline-flex;align-items:center;gap:6px;
-    font-family:'Barlow Condensed',sans-serif;font-size:16.5px;font-weight:700;
-    color:var(--ink);letter-spacing:0.2px;
+    display:inline-flex;align-items:baseline;gap:6px;
     background:var(--bg);border:1px solid var(--line);
-    padding:5px 12px 5px 9px;border-radius:100px;
+    padding:5px 12px;border-radius:100px;flex-shrink:0;
   }
-  .card-matricula svg{flex-shrink:0;color:var(--primary);}
+  .card-matricula-label{font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-faint);}
+  .card-matricula-value{font-family:'Barlow Condensed',sans-serif;font-size:16.5px;font-weight:700;color:var(--ink);letter-spacing:0.2px;}
+  .card-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
   .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:5px 11px;border-radius:100px;white-space:nowrap;letter-spacing:0.1px;}
   .pill-cancelada{background:var(--atrasado-soft);color:var(--atrasado);}
   .pill-ativa{background:#E1F3E8;color:var(--no-prazo);}
@@ -616,7 +626,12 @@
       <select id="filtroCidade"><option value="">Todas as cidades</option></select>
     </div>
 
-    <div id="resultCount"></div>
+    <div class="result-bar">
+      <div id="resultCount"></div>
+      <button class="sort-btn" id="btnOrdenar" type="button" title="Ordenar por data">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
+      </button>
+    </div>
     <div id="lista"></div>
   </div>
 
@@ -755,10 +770,12 @@ function fmtData(d){
 }
 
 function acharColunaPorPalavraChave(headers, palavras, excluir){
+  const palavrasNorm = palavras.map(semAcento);
+  const excluirNorm = excluir ? semAcento(excluir) : null;
   for(let i=0;i<headers.length;i++){
-    const h = String(headers[i]||'').toUpperCase();
-    if(excluir && h.includes(excluir)) continue;
-    if(palavras.some(p => h.includes(p))) return i;
+    const h = semAcento(headers[i]);
+    if(excluirNorm && h.includes(excluirNorm)) continue;
+    if(palavrasNorm.some(p => h.includes(p))) return i;
   }
   return -1;
 }
@@ -769,13 +786,23 @@ function acharColunaPorPalavraChave(headers, palavras, excluir){
 function processarPlanilha(rows){
   if(rows.length < 2) throw new Error("A planilha parece estar vazia.");
   const headers = rows[0];
-  const nCols = headers.length;
+  // nCols não pode depender só do tamanho do array de cabeçalhos: quando a
+  // planilha chega automaticamente pelo Firebase, o array de cabeçalhos
+  // (meta.headers) às vezes vem mais curto que as linhas de dados reais.
+  // Usamos o maior comprimento entre o cabeçalho e a primeira linha de
+  // dados para não "perder" colunas que existem nos dados mas não no
+  // cabeçalho salvo.
+  const nCols = Math.max(headers.length, (rows[1]||[]).length);
   const idx = (fixo, minCols) => (nCols > minCols ? fixo : Math.min(fixo, nCols-1));
 
   let motivoCol = acharColunaPorPalavraChave(headers, ['MOTIVO','NAO EXECUCAO','NÃO EXECUÇÃO','EXECUCAO','EXECUÇÃO']);
   let parecerNaoExecCol = acharColunaPorPalavraChave(headers, ['PARECER','NAO EXECUCAO','NÃO EXECUÇÃO'], 'SOLICITANTE');
   let parecerSolicCol = acharColunaPorPalavraChave(headers, ['PARECER','SOLICITANTE']);
   let bairroCol = acharColunaPorPalavraChave(headers, ['BAIRRO']);
+  let enderecoCol = acharColunaPorPalavraChave(headers, ['ENDERECO'], 'CODIGO');
+  let municipioCol = acharColunaPorPalavraChave(headers, ['MUNICIPIO']);
+  let hidrometroCol = acharColunaPorPalavraChave(headers, ['HIDROMETRO','MEDIDOR']);
+  let proprietarioCol = acharColunaPorPalavraChave(headers, ['PROPRIETARIO','TITULAR','CLIENTE','REQUERENTE','CONSUMIDOR']);
 
   const colOS = idx(1, 1), colCidade = idx(6,6), colMatricula = idx(7,7),
         colSituacaoOS = idx(8,8), colServico = idx(9,9), colData = idx(25,25), colSituacao = idx(21,21);
@@ -783,6 +810,28 @@ function processarPlanilha(rows){
   if(parecerNaoExecCol === -1) parecerNaoExecCol = nCols > 23 ? 23 : -1;
   if(parecerSolicCol === -1) parecerSolicCol = nCols > 22 ? 22 : -1;
   if(bairroCol === -1) bairroCol = nCols > 5 ? 5 : -1;
+  // Fallbacks para o layout padrão da exportação do SANSYS (Ordens de
+  // Serviço - Analítico), quando a busca por palavra-chave não encontra o
+  // cabeçalho (ex.: arquivo tem linhas de título antes do cabeçalho real).
+  if(enderecoCol === -1) enderecoCol = nCols > 3 ? 3 : -1;
+  if(municipioCol === -1) municipioCol = nCols > 6 ? 6 : -1;
+  if(hidrometroCol === -1) hidrometroCol = nCols > 14 ? 14 : -1;
+  if(proprietarioCol === -1) proprietarioCol = nCols > 19 ? 19 : -1;
+
+  // Diagnóstico: mostra no console quais colunas foram identificadas,
+  // útil para conferir rapidamente se algum cabeçalho não bateu com as
+  // palavras-chave esperadas (ex.: coluna se chama "Cliente" em vez de
+  // "Proprietário"). Abra o console do navegador (F12) para ver.
+  const nomeCol = (i) => (i>=0 && headers[i]!==undefined && headers[i]!=='') ? headers[i] : (i>=0 ? `(coluna ${i}, sem nome no cabeçalho)` : '(não encontrada)');
+  console.log('[Painel OS] Colunas detectadas:', {
+    endereco: nomeCol(enderecoCol),
+    municipio: nomeCol(municipioCol),
+    hidrometro: nomeCol(hidrometroCol),
+    proprietario: nomeCol(proprietarioCol),
+    bairro: nomeCol(bairroCol)
+  });
+  console.log('[Painel OS] Todos os cabeçalhos da planilha:', headers, '| nCols usado:', nCols);
+  console.log('[Painel OS] Exemplo da 1ª linha de dados:', rows[1]);
 
   const resultado = [];
   for(let r=1; r<rows.length; r++){
@@ -814,6 +863,10 @@ function processarPlanilha(rows){
       motivo: motivoCol>=0 ? String(row[motivoCol] ?? '').trim() : '',
       parecerNaoExec: parecerNaoExecCol>=0 ? String(row[parecerNaoExecCol] ?? '').trim() : '',
       parecerSolic: parecerSolicCol>=0 ? String(row[parecerSolicCol] ?? '').trim() : '',
+      endereco: enderecoCol>=0 ? String(row[enderecoCol] ?? '').trim() : '',
+      municipio: municipioCol>=0 ? String(row[municipioCol] ?? '').trim() : '',
+      hidrometro: hidrometroCol>=0 ? String(row[hidrometroCol] ?? '').trim() : '',
+      proprietario: proprietarioCol>=0 ? String(row[proprietarioCol] ?? '').trim() : '',
       dataFormatada: fmtData(parseData(row[colData])),
       dataRaw: row[colData]
     };
@@ -1372,6 +1425,113 @@ function renderLibGrid(){
   }
 }
 
+// ---- Seleção de cidades a partir da planilha carregada ----
+// Em vez de digitar cidade por cidade, lista todas as cidades distintas
+// encontradas na última planilha carregada e deixa marcar/desmarcar.
+function renderCidadesSection(folderId){
+  const f = pastas[folderId];
+  const valores = f.cidades || [];
+  const wrap = document.createElement('div');
+  wrap.className = 'crit-section';
+
+  const h = document.createElement('div');
+  h.className = 'crit-heading';
+  h.textContent = 'Cidades desta pasta';
+  wrap.appendChild(h);
+
+  const chipsWrap = document.createElement('div');
+  chipsWrap.className = 'chips';
+  if(!valores.length){
+    const emp = document.createElement('span');
+    emp.className = 'chips-empty';
+    emp.textContent = 'Qualquer cidade (nenhum filtro definido).';
+    chipsWrap.appendChild(emp);
+  } else {
+    valores.forEach(v => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = v;
+      const x = document.createElement('button');
+      x.type = 'button'; x.textContent = '×'; x.title = 'Remover';
+      x.addEventListener('click', () => removeCriterio(folderId, 'cidades', v));
+      chip.appendChild(x);
+      chipsWrap.appendChild(chip);
+    });
+  }
+  wrap.appendChild(chipsWrap);
+
+  // Cidades distintas da última planilha carregada, com contagem de OS.
+  const contagem = new Map();
+  DADOS_BRUTOS.forEach(row => {
+    const nome = String(row.cidade || '').trim();
+    if(!nome) return;
+    contagem.set(nome, (contagem.get(nome) || 0) + 1);
+  });
+  const disponiveis = Array.from(contagem.keys()).sort((a,b)=>a.localeCompare(b,'pt-BR'));
+
+  if(disponiveis.length){
+    const note = document.createElement('p');
+    note.className = 'kw-note';
+    note.textContent = 'Marque as cidades da planilha carregada que devem entrar nesta pasta.';
+    wrap.appendChild(note);
+
+    const list = document.createElement('div');
+    list.className = 'kw-result-list';
+    disponiveis.forEach(nome => {
+      const marcado = valores.includes(nome);
+      const item = document.createElement('label');
+      item.className = 'kw-result-item' + (marcado ? ' kw-added' : '');
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = marcado;
+      cb.addEventListener('change', () => {
+        if(cb.checked) addCriterio(folderId, 'cidades', nome);
+        else removeCriterio(folderId, 'cidades', nome);
+      });
+      const span = document.createElement('span');
+      span.textContent = nome;
+      const count = document.createElement('span');
+      count.className = 'kw-result-count';
+      count.textContent = contagem.get(nome) + ' OS';
+      item.appendChild(cb);
+      item.appendChild(span);
+      item.appendChild(count);
+      list.appendChild(item);
+    });
+    wrap.appendChild(list);
+  } else {
+    const note = document.createElement('p');
+    note.className = 'kw-note';
+    note.textContent = 'Carregue uma planilha para listar as cidades disponíveis automaticamente. Enquanto isso, digite manualmente abaixo.';
+    wrap.appendChild(note);
+  }
+
+  // Digitação manual continua disponível (útil se a cidade não estiver
+  // na planilha atual, ou antes de qualquer upload).
+  const addRow = document.createElement('div');
+  addRow.className = 'chip-add';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'Ou digite o nome da cidade e Enter';
+  const btn = document.createElement('button');
+  btn.className = 'mini-btn';
+  btn.type = 'button';
+  btn.textContent = 'Adicionar';
+  const doAdd = () => {
+    if(!input.value.trim()) return;
+    addCriterio(folderId, 'cidades', input.value);
+    input.value = '';
+    input.focus();
+  };
+  btn.addEventListener('click', doAdd);
+  input.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); doAdd(); } });
+  addRow.appendChild(input);
+  addRow.appendChild(btn);
+  wrap.appendChild(addRow);
+
+  return wrap;
+}
+
 function renderChipsSection(folderId, campo, titulo, placeholder, textoVazio){
   const f = pastas[folderId];
   const valores = f[campo] || [];
@@ -1642,7 +1802,7 @@ function renderFolderDetail(){
     }
   }
 
-  block.appendChild(renderChipsSection(currentFolderId, 'cidades', 'Cidades desta pasta', 'Digite a cidade e Enter', 'Qualquer cidade (nenhum filtro definido).'));
+  block.appendChild(renderCidadesSection(currentFolderId));
   block.appendChild(renderChipsSection(currentFolderId, 'servicos', 'Serviços desta pasta (nome exato)', 'Digite o serviço (exatamente como na planilha) e Enter', 'Nenhum serviço exato adicionado.'));
   block.appendChild(renderPalavraChaveBuscaSection(currentFolderId));
   if((f.palavrasChave || []).length){
@@ -2070,6 +2230,17 @@ document.querySelectorAll('.stat').forEach(el=>{
 
 const ORDEM_STATUS = {'atrasado':0,'vence-hoje':1,'vence-1-dia':2,'no-prazo':3};
 
+// Ordenação da lista: 'urgencia' (padrão, atrasadas primeiro), 'data-desc'
+// (mais recente -> mais antiga) ou 'data-asc' (mais antiga -> mais recente).
+let ordenacaoAtiva = 'urgencia';
+
+document.getElementById('btnOrdenar').addEventListener('click', function(){
+  ordenacaoAtiva = (ordenacaoAtiva === 'data-desc') ? 'data-asc' : 'data-desc';
+  this.classList.add('active');
+  this.classList.toggle('reversed', ordenacaoAtiva === 'data-asc');
+  aplicarFiltros();
+});
+
 function aplicarFiltros(){
   if(!servicoAtivo) return;
   const busca = semAcento(document.getElementById('busca').value);
@@ -2087,11 +2258,22 @@ function aplicarFiltros(){
     return true;
   });
 
-  filtrados.sort((a,b)=>{
-    const oa = ORDEM_STATUS[a.status], ob = ORDEM_STATUS[b.status];
-    if(oa !== ob) return oa - ob;
-    return horasTotaisAtraso(b) - horasTotaisAtraso(a);
-  });
+  if(ordenacaoAtiva === 'data-desc' || ordenacaoAtiva === 'data-asc'){
+    const sentido = (ordenacaoAtiva === 'data-desc') ? -1 : 1;
+    filtrados.sort((a,b)=>{
+      const da = parseData(a.dataRaw), db = parseData(b.dataRaw);
+      if(!da && !db) return 0;
+      if(!da) return 1;
+      if(!db) return -1;
+      return sentido * (da - db);
+    });
+  } else {
+    filtrados.sort((a,b)=>{
+      const oa = ORDEM_STATUS[a.status], ob = ORDEM_STATUS[b.status];
+      if(oa !== ob) return oa - ob;
+      return horasTotaisAtraso(b) - horasTotaisAtraso(a);
+    });
+  }
 
   document.getElementById('resultCount').textContent = `${filtrados.length} OS encontradas`;
   renderLista(filtrados);
@@ -2116,7 +2298,6 @@ function pillClasseSituacao(valor){
   return 'pill-pendente';
 }
 
-const ICO_MATRICULA = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 4v5"/></svg>';
 const ICO_MOTIVO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
 
 function renderLista(lista){
@@ -2136,15 +2317,17 @@ function renderLista(lista){
       <div class="card-head" onclick="toggleCard(${i})">
         <div class="left">
           <div class="card-os">OS ${escapeHtml(d.os)}</div>
-          <div class="card-local">${escapeHtml(d.cidade)}${d.bairro ? ' — ' + escapeHtml(d.bairro) : ''}</div>
+          <div class="card-local">${escapeHtml(d.cidade)}</div>
         </div>
         <div class="badge st-${d.status}">${LABEL_STATUS[d.status]}${diasLabel ? `<span class="badge-days">${diasLabel}</span>` : ''}</div>
       </div>
       <div class="card-quick" onclick="toggleCard(${i})">
         <div class="card-quick-row">
-          ${d.matricula ? `<span class="card-matricula">${ICO_MATRICULA}${escapeHtml(d.matricula)}</span>` : ''}
-          ${d.situacaoOS ? `<span class="pill ${pillClasseMatricula(d.situacaoOS)}">${escapeHtml(d.situacaoOS)}</span>` : ''}
-          ${d.situacao ? `<span class="pill ${pillClasseSituacao(d.situacao)}">${escapeHtml(d.situacao)}</span>` : ''}
+          ${d.matricula ? `<span class="card-matricula"><span class="card-matricula-label">Matrícula</span><span class="card-matricula-value">${escapeHtml(d.matricula)}</span></span>` : ''}
+          <div class="card-pills">
+            ${d.situacaoOS ? `<span class="pill ${pillClasseMatricula(d.situacaoOS)}">${escapeHtml(d.situacaoOS)}</span>` : ''}
+            ${d.situacao ? `<span class="pill ${pillClasseSituacao(d.situacao)}">${escapeHtml(d.situacao)}</span>` : ''}
+          </div>
         </div>
         ${d.motivo ? `<div class="card-motivo">${ICO_MOTIVO}<span>${escapeHtml(d.motivo)}</span></div>` : ''}
       </div>
@@ -2153,6 +2336,11 @@ function renderLista(lista){
         <div><b>Situação da Matrícula:</b> ${escapeHtml(d.situacaoOS || '—')}</div>
         <div><b>Situação:</b> ${escapeHtml(d.situacao || '—')}</div>
         <div><b>Prazo:</b> ${escapeHtml(d.dataFormatada || '—')}</div>
+        <div><b>Endereço:</b> ${escapeHtml(d.endereco || '—')}</div>
+        <div><b>Bairro:</b> ${escapeHtml(d.bairro || '—')}</div>
+        <div><b>Município:</b> ${escapeHtml(d.municipio || d.cidade || '—')}</div>
+        <div><b>Hidrômetro:</b> ${escapeHtml(d.hidrometro || '—')}</div>
+        <div><b>Nome do Proprietário:</b> ${escapeHtml(d.proprietario || '—')}</div>
         <div><b>Motivo não execução:</b> ${escapeHtml(d.motivo || '—')}</div>
         <div><b>Parecer não execução:</b> ${escapeHtml(d.parecerNaoExec || '—')}</div>
         <div><b>Parecer solicitante:</b> ${escapeHtml(d.parecerSolic || '—')}</div>
