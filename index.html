@@ -250,42 +250,42 @@
   }
   input.busca-top:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft);}
   .grupo-titulo{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--ink-soft);margin:20px 4px 8px;}
-  .servico-card{
-    background:var(--surface);border-radius:16px;padding:14px 15px 14px 18px;margin-bottom:9px;display:flex;
-    flex-direction:column;align-items:stretch;gap:0;cursor:pointer;position:relative;overflow:hidden;
-    border:1px solid var(--line);box-shadow:0 1px 2px rgba(18,49,45,0.04),0 4px 12px -6px rgba(18,49,45,0.1);
-    transition:box-shadow .16s ease,transform .12s ease;
+  #listaServicos{
+    background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;
   }
-  .servico-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line);}
-  .servico-card.tem-atraso::before{background:linear-gradient(180deg,#CC4C42,var(--atrasado));}
-  .servico-card:active{transform:scale(0.985);}
-  .servico-top{display:flex;justify-content:space-between;align-items:center;gap:10px;}
-  .servico-nome{font-size:14.5px;font-weight:600;color:var(--ink);line-height:1.3;}
-  .servico-total{font-size:12px;color:var(--ink-soft);margin-top:3px;}
-  .servico-right{display:flex;align-items:center;gap:9px;flex-shrink:0;}
+  #listaServicos .servico-card+.servico-card{border-top:1px solid var(--line);}
+  .servico-card{
+    display:grid;grid-template-columns:minmax(0,1fr) auto 24px;grid-template-rows:auto auto;
+    column-gap:10px;row-gap:7px;align-items:center;
+    padding:12px 14px;cursor:pointer;position:relative;
+    transition:background .12s ease;
+  }
+  .servico-card:active{background:var(--primary-soft);}
+  .servico-top{display:contents;}
+  .servico-info{grid-column:1;grid-row:1;min-width:0;}
+  .servico-nome{font-size:14px;font-weight:600;color:var(--ink);line-height:1.3;white-space:normal;overflow-wrap:break-word;}
+  .servico-total{font-size:11.5px;color:var(--ink-soft);margin-top:2px;}
+  .servico-right{display:contents;}
 
   /* ---- Mini gráfico: Pendente / Postergada / Programado ---- */
-  .servico-breakdown{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);}
+  .servico-table-head{display:none;}
+  .servico-breakdown{display:contents;}
   .sb-stack{
-    display:flex;width:100%;height:8px;border-radius:100px;overflow:hidden;background:var(--bg);
+    grid-column:1/-1;grid-row:2;display:flex;width:100%;height:6px;border-radius:100px;overflow:hidden;background:var(--bg);
   }
   .sb-seg{display:block;height:100%;min-width:0;}
   .sb-seg.pendente{background:linear-gradient(90deg,var(--primary),var(--primary-dark));}
   .sb-seg.postergada{background:linear-gradient(90deg,#F0B455,#C98A1F);}
   .sb-seg.programado{background:linear-gradient(90deg,#6BAEDA,var(--um-dia));}
   .sb-seg+.sb-seg{box-shadow:-1px 0 0 rgba(255,255,255,0.6);}
-  .sb-legend{display:flex;flex-wrap:wrap;gap:5px 16px;margin-top:9px;}
-  .sb-item{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--ink-soft);white-space:nowrap;}
-  .sb-item b{color:var(--ink);font-weight:700;margin-left:1px;font-variant-numeric:tabular-nums;}
-  .sb-dot{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0;}
-  .sb-dot.pendente{background:var(--primary);}
-  .sb-dot.postergada{background:var(--hoje);}
-  .sb-dot.programado{background:var(--um-dia);}
+  .sb-legend{display:none;}
   .pill{
+    grid-column:2;grid-row:1;justify-self:end;
     font-size:11px;font-weight:700;color:#fff;background:linear-gradient(135deg,#CC4C42,var(--atrasado) 70%,#A8362E);
     padding:5px 11px;border-radius:100px;white-space:nowrap;box-shadow:0 2px 6px -2px rgba(193,68,59,0.5);
   }
   .chevron{
+    grid-column:3;grid-row:1;
     color:var(--ink-faint);font-size:16px;line-height:1;flex-shrink:0;width:26px;height:26px;border-radius:50%;
     background:var(--bg);display:inline-flex;align-items:center;justify-content:center;
   }
@@ -396,46 +396,38 @@
   .sort-btn svg{transition:transform .15s ease;}
   .sort-btn.reversed svg{transform:rotate(180deg);}
 
-  .card{
-    background:var(--surface);border-radius:18px;margin-bottom:12px;overflow:hidden;
-    position:relative;border:1px solid var(--line);
-    box-shadow:0 1px 2px rgba(18,49,45,0.04),0 6px 16px -8px rgba(18,49,45,0.12);
-    transition:box-shadow .18s ease,transform .12s ease;
+  #lista{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;}
+  .lista-table-head{display:none;}
+  #lista .card+.card{border-top:1px solid var(--line);}
+  .card{position:relative;}
+  .card-row{
+    display:grid;grid-template-columns:minmax(0,1fr) auto 18px;column-gap:8px;align-items:center;
+    padding:10px 12px;cursor:pointer;
   }
-  .card:active{transform:scale(0.988);}
-  .card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--line);border-radius:4px 0 0 4px;}
-  .card.st-atrasado::before{background:linear-gradient(180deg,var(--atrasado),#A8362E);}
-  .card.st-vence-hoje::before{background:var(--hoje);}
-  .card.st-vence-1-dia::before{background:var(--um-dia);}
-  .card.st-no-prazo::before{background:var(--no-prazo);}
-  .card-head{padding:14px 16px 10px 19px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;cursor:pointer;}
-  .card-head .left{min-width:0;}
-  .card-os{font-size:10.5px;color:var(--ink-faint);font-weight:700;letter-spacing:0.6px;text-transform:uppercase;}
-  .card-local{font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:600;color:var(--ink);margin-top:3px;line-height:1.22;}
+  .card-row:active{background:var(--primary-soft);}
+  .card-main{grid-column:1;min-width:0;}
+  .card-os-row{display:flex;align-items:center;gap:5px;}
+  .card-sit-chip{
+    flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+    min-width:16px;height:15px;padding:0 4px;border-radius:4px;
+    font-size:9px;font-weight:800;letter-spacing:0.2px;line-height:1;
+  }
+  .card-os{font-size:10px;color:var(--ink-faint);font-weight:700;letter-spacing:0.5px;text-transform:uppercase;}
+  .card-local{font-size:14px;font-weight:600;color:var(--ink);margin-top:1px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .card-matricula-col{display:none;}
+  .card-situacao-col{display:none;}
   .badge{
-    flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    font-size:11px;font-weight:700;padding:7px 13px;border-radius:13px;color:#fff;
-    white-space:nowrap;text-align:center;letter-spacing:0.2px;
-    box-shadow:0 3px 8px -2px rgba(0,0,0,0.18);
+    grid-column:2;flex-shrink:0;display:inline-flex;align-items:center;gap:5px;
+    font-size:11px;font-weight:700;padding:5px 11px;border-radius:100px;white-space:nowrap;letter-spacing:0.1px;
   }
-  .badge .badge-days{display:block;font-size:9.5px;font-weight:600;opacity:0.88;margin-top:2px;letter-spacing:0.1px;text-transform:none;}
-  .badge.st-atrasado{background:linear-gradient(135deg,#CC4C42,var(--atrasado) 65%,#A8362E);}
-  .badge.st-vence-hoje{background:linear-gradient(135deg,#F0B455,var(--hoje));color:#3A2604;}
-  .badge.st-vence-1-dia{background:linear-gradient(135deg,#5E9FCB,var(--um-dia));}
-  .badge.st-no-prazo{background:linear-gradient(135deg,#4FA173,var(--no-prazo));}
+  .badge .badge-days{font-size:10px;font-weight:600;opacity:0.85;}
+  .badge.st-atrasado{background:var(--atrasado-soft);color:var(--atrasado);}
+  .badge.st-vence-hoje{background:#FDF1DE;color:#9C6A17;}
+  .badge.st-vence-1-dia{background:#E7F0FA;color:var(--um-dia);}
+  .badge.st-no-prazo{background:#E1F3E8;color:var(--no-prazo);}
+  .chevron-mini{grid-column:3;color:var(--ink-faint);display:inline-flex;align-items:center;justify-content:center;}
 
-  /* ---- Resumo rápido (sempre visível, sem legendas) ---- */
-  .card-quick{padding:0 16px 14px 19px;display:flex;flex-direction:column;gap:9px;}
-  .card-quick-row{display:flex;align-items:center;justify-content:space-between;gap:8px 10px;flex-wrap:wrap;}
-  .card-matricula{
-    display:inline-flex;align-items:baseline;gap:6px;
-    background:var(--bg);border:1px solid var(--line);
-    padding:5px 12px;border-radius:100px;flex-shrink:0;
-  }
-  .card-matricula-label{font-size:10px;font-weight:700;letter-spacing:0.4px;text-transform:uppercase;color:var(--ink-faint);}
-  .card-matricula-value{font-family:'Barlow Condensed',sans-serif;font-size:16.5px;font-weight:700;color:var(--ink);letter-spacing:0.2px;}
-  .card-pills{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
-  .pill{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:5px 11px;border-radius:100px;white-space:nowrap;letter-spacing:0.1px;}
+  .pill{display:inline-flex;align-items:center;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:100px;white-space:nowrap;letter-spacing:0.1px;}
   .pill-cancelada{background:var(--atrasado-soft);color:var(--atrasado);}
   .pill-ativa{background:#E1F3E8;color:var(--no-prazo);}
   .pill-suspensa{background:#FDF1DE;color:#9C6A17;}
@@ -443,11 +435,6 @@
   .pill-pendente{background:var(--primary-soft);color:var(--primary-dark);}
   .pill-postergada{background:#FDF1DE;color:#9C6A17;}
   .pill-programado{background:#E7F0FA;color:var(--um-dia);}
-  .card-motivo{
-    font-size:12.5px;color:var(--ink-soft);line-height:1.45;display:flex;gap:7px;align-items:flex-start;
-    background:var(--bg);border-radius:11px;padding:8px 10px;
-  }
-  .card-motivo svg{flex-shrink:0;margin-top:1px;color:var(--accent);}
 
   .card-body{display:none;padding:11px 16px 15px 19px;font-size:13px;color:var(--ink-soft);border-top:1px dashed var(--line);margin-top:2px;}
   .card-body.open{display:block;animation:cardBodyIn .16s ease;}
@@ -493,6 +480,109 @@
     background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.3);color:#fff;
     font-size:12px;padding:7px 12px;border-radius:20px;font-weight:600;cursor:pointer;
     white-space:nowrap;font-family:inherit;
+  }
+
+  /* =========================================================================
+     VISUAL EXCLUSIVO PARA COMPUTADOR (telas largas)
+     Nada aqui dentro afeta o celular: o media query só entra em vigor a
+     partir de 1000px de largura, o suficiente pra separar computador/tablet
+     grande de celular (mesmo em modo paisagem). No celular, tudo continua
+     exatamente como estava antes.
+  ========================================================================= */
+  @media (min-width: 1000px){
+
+    body{ padding-bottom:60px; }
+
+    header{ padding:22px 40px 26px; }
+    header .top-row{ max-width:1100px; margin:0 auto; }
+    header .status-bar{ max-width:1100px; margin:12px auto 0; }
+    header h1{ font-size:30px; }
+    .btn-pill{ padding:8px 16px; cursor:pointer; transition:filter .12s ease, transform .12s ease; }
+    .btn-pill:hover{ filter:brightness(1.08); transform:translateY(-1px); }
+
+    main{ max-width:1100px; padding:28px 32px 0; }
+
+    .panel{ padding:22px 26px; }
+    .panel h2{ font-size:16px; }
+
+    /* Biblioteca de pastas: mais colunas e cards maiores */
+    .lib-grid{ grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; }
+    .lib-card{
+      padding:14px 16px; transition:box-shadow .14s ease, border-color .14s ease, transform .1s ease;
+      cursor:pointer;
+    }
+    .lib-card:hover{
+      border-color:var(--primary); box-shadow:0 6px 18px -8px rgba(18,49,45,0.22); transform:translateY(-1px);
+    }
+    .lib-card:active{ transform:scale(1); }
+
+    .mini-btn{ cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+    .mini-btn:hover{ background:var(--primary-soft); border-color:#C7E0D8; }
+    .mini-btn.dark:hover{ background:var(--primary-dark); }
+    .mini-btn.danger:hover{ background:var(--atrasado-soft); border-color:#E7B4AE; color:var(--atrasado); }
+
+    /* Cartões de gauge com mais espaço */
+    .gauge-card{ padding:22px 26px; }
+
+    /* Lista de serviços: no celular já é uma linha densa (2 linhas por card,
+       barra fininha embaixo). No desktop, com espaço sobrando, viram uma
+       única linha por serviço com o total de OS em coluna própria e um
+       cabeçalho fixo em cima. */
+    .servico-table-head{
+      display:grid; grid-template-columns:minmax(0,1fr) 70px 100px 170px 26px; gap:14px;
+      padding:8px 16px; margin-top:16px; font-size:11.5px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint);
+    }
+    .servico-card{
+      grid-template-columns:minmax(0,1fr) 70px 100px 170px 26px; grid-template-rows:auto;
+      column-gap:14px; padding:11px 16px;
+    }
+    .servico-card:active{ background:var(--primary-soft); }
+    .servico-info{ display:contents; }
+    .servico-nome{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .servico-total{ grid-column:2; grid-row:1; text-align:right; margin-top:0; }
+    .pill{ grid-column:3; }
+    .sb-stack{ grid-column:4; grid-row:1; height:6px; }
+    .chevron{ grid-column:5; }
+
+    /* Painel de estatísticas do serviço: 4 colunas lado a lado em vez de 2x2 */
+    .stat-grid{ grid-template-columns:repeat(4,1fr); gap:12px; }
+    .stat{ padding:14px 16px; cursor:pointer; transition:transform .12s ease, box-shadow .12s ease; }
+    .stat:hover{ transform:translateY(-2px); box-shadow:0 6px 16px -8px rgba(18,49,45,0.18); }
+
+    /* Busca e filtro de cidade lado a lado */
+    .filters{ flex-direction:row; }
+    .filters input{ flex:1; }
+    .filters select{ flex:0 0 220px; }
+
+    .motivo-item{ cursor:pointer; transition:background .12s ease, border-color .12s ease; }
+    .motivo-item:hover{ background:var(--primary-soft); border-color:#C7E0D8; }
+    .motivo-item:active{ transform:scale(1); }
+
+    /* Lista de OS dentro de um serviço: mesma lógica da lista de serviços —
+       no celular fica em 2 linhas compactas (identificação + meta), no
+       desktop tudo entra numa única linha por OS. */
+    .lista-table-head{
+      display:grid; grid-template-columns:minmax(0,1fr) 110px 130px 150px 18px; column-gap:16px;
+      padding:8px 16px; margin-top:16px; font-size:11.5px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.04em; color:var(--ink-faint);
+    }
+    .card-row{
+      grid-template-columns:minmax(0,1fr) 110px 130px 150px 18px;
+      column-gap:16px; padding:11px 16px;
+    }
+    .card-row:active{ background:var(--primary-soft); }
+    .card-row:hover{ background:var(--primary-soft); }
+    .card-matricula-col{
+      display:block; grid-column:2; font-size:13px; color:var(--ink-soft);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .card-situacao-col{ display:block; grid-column:3; }
+    .card-sit-chip{ display:none; }
+    .badge{ grid-column:4; justify-self:start; }
+    .chevron-mini{ grid-column:5; }
+
+    .lib-modal{ max-width:420px; }
   }
 </style>
 </head>
@@ -583,6 +673,13 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" class="busca-top" id="buscaServico" placeholder="Buscar serviço...">
     </div>
+    <div class="servico-table-head">
+      <div>Serviço</div>
+      <div style="text-align:right">OS</div>
+      <div style="text-align:right">Atrasadas</div>
+      <div>Distribuição</div>
+      <div></div>
+    </div>
     <div id="listaServicos"></div>
   </div>
 
@@ -631,6 +728,13 @@
       <button class="sort-btn" id="btnOrdenar" type="button" title="Ordenar por data">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 16-4 4-4-4"/><path d="M17 20V4"/><path d="m3 8 4-4 4 4"/><path d="M7 4v16"/></svg>
       </button>
+    </div>
+    <div class="lista-table-head">
+      <div>OS / Bairro</div>
+      <div>Matrícula</div>
+      <div>Situação</div>
+      <div>Status</div>
+      <div></div>
     </div>
     <div id="lista"></div>
   </div>
@@ -1953,7 +2057,7 @@ function renderListaServicos(){
     html += `
       <div class="servico-card ${temAtraso?'tem-atraso':''}" onclick="abrirServico('${nome.replace(/'/g,"\\'")}')">
         <div class="servico-top">
-          <div>
+          <div class="servico-info">
             <div class="servico-nome">${escapeHtml(nome)}</div>
             <div class="servico-total">${st.total} OS</div>
           </div>
@@ -2298,6 +2402,14 @@ function pillClasseSituacao(valor){
   return 'pill-pendente';
 }
 
+function siglaSituacao(valor){
+  const v = semAcento(valor || '').toUpperCase();
+  if(v === 'POSTERGADA') return 'PT';
+  if(v === 'PROGRAMADO') return 'PR';
+  if(v === 'PENDENTE') return 'P';
+  return '?';
+}
+
 const ICO_MOTIVO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
 
 function renderLista(lista){
@@ -2314,22 +2426,18 @@ function renderLista(lista){
       : (d.status==='no-prazo' ? `em ${d.dias} dia${d.dias!==1?'s':''}` : '');
     return `
     <div class="card st-${d.status}">
-      <div class="card-head" onclick="toggleCard(${i})">
-        <div class="left">
-          <div class="card-os">OS ${escapeHtml(d.os)}</div>
+      <div class="card-row" onclick="toggleCard(${i})">
+        <div class="card-main">
+          <div class="card-os-row">
+            ${d.situacao ? `<span class="card-sit-chip ${pillClasseSituacao(d.situacao)}" title="${escapeHtml(d.situacao)}">${siglaSituacao(d.situacao)}</span>` : ''}
+            <div class="card-os">OS ${escapeHtml(d.os)}</div>
+          </div>
           <div class="card-local">${escapeHtml(d.cidade)}</div>
         </div>
+        <div class="card-matricula-col">${d.matricula ? escapeHtml(d.matricula) : '—'}</div>
+        <div class="card-situacao-col">${d.situacao ? `<span class="pill ${pillClasseSituacao(d.situacao)}">${escapeHtml(d.situacao)}</span>` : ''}</div>
         <div class="badge st-${d.status}">${LABEL_STATUS[d.status]}${diasLabel ? `<span class="badge-days">${diasLabel}</span>` : ''}</div>
-      </div>
-      <div class="card-quick" onclick="toggleCard(${i})">
-        <div class="card-quick-row">
-          ${d.matricula ? `<span class="card-matricula"><span class="card-matricula-label">Matrícula</span><span class="card-matricula-value">${escapeHtml(d.matricula)}</span></span>` : ''}
-          <div class="card-pills">
-            ${d.situacaoOS ? `<span class="pill ${pillClasseMatricula(d.situacaoOS)}">${escapeHtml(d.situacaoOS)}</span>` : ''}
-            ${d.situacao ? `<span class="pill ${pillClasseSituacao(d.situacao)}">${escapeHtml(d.situacao)}</span>` : ''}
-          </div>
-        </div>
-        ${d.motivo ? `<div class="card-motivo">${ICO_MOTIVO}<span>${escapeHtml(d.motivo)}</span></div>` : ''}
+        <span class="chevron-mini"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg></span>
       </div>
       <div class="card-body" id="body-${i}">
         <div><b>Matrícula:</b> ${escapeHtml(d.matricula || '—')}</div>
