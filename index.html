@@ -1247,15 +1247,18 @@ function computeMatches(){
       const cidades = f.cidades || [];
       const servicos = f.servicos || [];
       const palavras = f.palavrasChave || [];
-      if(!cidades.length && !servicos.length && !palavras.length) return; // pasta sem nenhum critério próprio não recebe nada
+      // A pasta só passa a receber OS depois que tiver pelo menos um
+      // Serviço ou uma Palavra-chave configurado. Ter só a cidade herdada
+      // da pasta-mãe (preenchida automaticamente ao criar a pasta) não é
+      // suficiente — isso evita que toda pasta recém-criada já apareça
+      // com todos os serviços daquela cidade.
+      if(!servicos.length && !palavras.length) return;
       const cidadeOk = !cidades.length || cidades.some(c => semAcento(c) === cidadeNorm);
       // Serviço bate se o nome for exatamente igual a um da lista de serviços
-      // OU se contiver alguma das palavras-chave configuradas. Se nenhum dos
-      // dois campos de serviço estiver preenchido, qualquer serviço passa.
-      const temFiltroServico = servicos.length || palavras.length;
+      // OU se contiver alguma das palavras-chave configuradas.
       const bateExato = servicos.length && servicos.some(s => semAcento(s) === servicoNorm);
       const batePalavra = palavras.length && palavras.some(p => servicoNorm.includes(semAcento(p)));
-      const servicoOk = !temFiltroServico || bateExato || batePalavra;
+      const servicoOk = bateExato || batePalavra;
       if(cidadeOk && servicoOk) matchesPorPasta[id].push(row);
     });
   });
