@@ -1608,7 +1608,15 @@ function renderLibGrid(){
 // ---- Seleção de cidades a partir da planilha carregada ----
 // Em vez de digitar cidade por cidade, lista todas as cidades distintas
 // encontradas na última planilha carregada e deixa marcar/desmarcar.
+// Guarda as cidades marcadas na lista (mas ainda não confirmadas) enquanto
+// o admin vai clicando nas caixinhas, pra não salvar/recalcular tudo a cada
+// clique — só quando ele confirma com o botão "Adicionar selecionadas".
+let cidadeSelState = { folderId: null, selecionadas: new Set() };
+
 function renderCidadesSection(folderId){
+  if(cidadeSelState.folderId !== folderId){
+    cidadeSelState = { folderId, selecionadas: new Set() };
+  }
   const f = pastas[folderId];
   const valores = f.cidades || [];
   const wrap = document.createElement('div');
@@ -1652,33 +1660,65 @@ function renderCidadesSection(folderId){
   if(disponiveis.length){
     const note = document.createElement('p');
     note.className = 'kw-note';
-    note.textContent = 'Marque as cidades da planilha carregada que devem entrar nesta pasta.';
+    note.textContent = 'Marque as cidades da planilha carregada que devem entrar nesta pasta e confirme com o botão abaixo.';
     wrap.appendChild(note);
 
     const list = document.createElement('div');
     list.className = 'kw-result-list';
+    let addSelBtn; // referenciado pelo listener de cada checkbox
+    const updateAddSelBtn = () => {
+      const n = cidadeSelState.selecionadas.size;
+      addSelBtn.textContent = n ? ('Adicionar ' + n + ' selecionada' + (n > 1 ? 's' : '')) : 'Adicionar selecionadas';
+      addSelBtn.disabled = !n;
+    };
     disponiveis.forEach(nome => {
-      const marcado = valores.includes(nome);
+      const jaAdicionada = valores.includes(nome);
+      const marcado = jaAdicionada || cidadeSelState.selecionadas.has(nome);
       const item = document.createElement('label');
       item.className = 'kw-result-item' + (marcado ? ' kw-added' : '');
       const cb = document.createElement('input');
       cb.type = 'checkbox';
       cb.checked = marcado;
+      cb.disabled = jaAdicionada;
       cb.addEventListener('change', () => {
-        if(cb.checked) addCriterio(folderId, 'cidades', nome);
-        else removeCriterio(folderId, 'cidades', nome);
+        // Só mexe no estado local (sem salvar/recalcular ainda), pra marcar
+        // várias cidades seguidas sem travar.
+        if(cb.checked) cidadeSelState.selecionadas.add(nome);
+        else cidadeSelState.selecionadas.delete(nome);
+        updateAddSelBtn();
       });
       const span = document.createElement('span');
       span.textContent = nome;
       const count = document.createElement('span');
       count.className = 'kw-result-count';
-      count.textContent = contagem.get(nome) + ' OS';
+      count.textContent = jaAdicionada ? 'já adicionada' : (contagem.get(nome) + ' OS');
       item.appendChild(cb);
       item.appendChild(span);
       item.appendChild(count);
       list.appendChild(item);
     });
     wrap.appendChild(list);
+
+    const actions = document.createElement('div');
+    actions.className = 'kw-actions';
+    addSelBtn = document.createElement('button');
+    addSelBtn.type = 'button';
+    addSelBtn.className = 'mini-btn dark';
+    updateAddSelBtn();
+    addSelBtn.addEventListener('click', () => {
+      if(!cidadeSelState.selecionadas.size) return;
+      const atuais = f.cidades || [];
+      const set = new Set(atuais);
+      cidadeSelState.selecionadas.forEach(nome => set.add(nome));
+      f.cidades = Array.from(set);
+      savePastas();
+      computeMatches();
+      cidadeSelState = { folderId, selecionadas: new Set() };
+      renderFolderDetail();
+      renderLibGrid();
+    });
+    actions.appendChild(addSelBtn);
+    wrap.appendChild(actions);
   } else {
     const note = document.createElement('p');
     note.className = 'kw-note';
