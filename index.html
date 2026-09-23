@@ -975,9 +975,12 @@ function processarPlanilha(rows){
   let municipioCol = acharColunaPorPalavraChave(headers, ['MUNICIPIO']);
   let hidrometroCol = acharColunaPorPalavraChave(headers, ['HIDROMETRO','MEDIDOR']);
   let proprietarioCol = acharColunaPorPalavraChave(headers, ['PROPRIETARIO','TITULAR','CLIENTE','REQUERENTE','CONSUMIDOR']);
+  let matriculaCol = acharColunaPorPalavraChave(headers, ['MATRICULA']);
 
-  const colOS = idx(1, 1), colCidade = idx(6,6), colMatricula = idx(7,7),
+  const colOS = idx(1, 1), colCidade = idx(6,6),
         colSituacaoOS = idx(8,8), colServico = idx(9,9), colData = idx(25,25), colSituacao = idx(21,21);
+  if(matriculaCol === -1) matriculaCol = idx(7,7);
+  const colMatricula = matriculaCol;
   if(motivoCol === -1) motivoCol = nCols > 24 ? 24 : -1;
   if(parecerNaoExecCol === -1) parecerNaoExecCol = nCols > 23 ? 23 : -1;
   if(parecerSolicCol === -1) parecerSolicCol = nCols > 22 ? 22 : -1;
@@ -1000,7 +1003,8 @@ function processarPlanilha(rows){
     municipio: nomeCol(municipioCol),
     hidrometro: nomeCol(hidrometroCol),
     proprietario: nomeCol(proprietarioCol),
-    bairro: nomeCol(bairroCol)
+    bairro: nomeCol(bairroCol),
+    matricula: nomeCol(matriculaCol)
   });
   console.log('[Painel OS] Todos os cabeçalhos da planilha:', headers, '| nCols usado:', nCols);
   console.log('[Painel OS] Exemplo da 1ª linha de dados:', rows[1]);
@@ -2416,6 +2420,7 @@ function exportarExcelServicoAtual(){
   if(!itens.length){ mostrarCopyToast('Nenhuma OS para exportar'); return; }
 
   const linhas = itens.map(d => ({
+    'Matrícula': d.matricula,
     'OS': d.os,
     'Status': LABEL_STATUS[d.status] || '',
     'Situação': d.situacao,
@@ -2424,7 +2429,6 @@ function exportarExcelServicoAtual(){
     'Bairro': d.bairro,
     'Município': d.municipio,
     'Endereço': d.endereco,
-    'Matrícula': d.matricula,
     'Situação da Matrícula': d.situacaoOS,
     'Hidrômetro': d.hidrometro,
     'Proprietário': d.proprietario,
@@ -2435,8 +2439,8 @@ function exportarExcelServicoAtual(){
 
   const ws = XLSX.utils.json_to_sheet(linhas);
   ws['!cols'] = [
-    {wch:10},{wch:14},{wch:12},{wch:12},{wch:20},{wch:20},{wch:20},{wch:28},
-    {wch:14},{wch:22},{wch:14},{wch:24},{wch:24},{wch:28},{wch:28}
+    {wch:14},{wch:10},{wch:14},{wch:12},{wch:12},{wch:20},{wch:20},{wch:20},{wch:28},
+    {wch:22},{wch:14},{wch:24},{wch:24},{wch:28},{wch:28}
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'OS');
