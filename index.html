@@ -223,6 +223,17 @@
   .lib-modal-input:focus{outline:none;border-color:var(--primary);background:var(--surface);}
   .lib-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
 
+  /* ---- Senha por pasta ---- */
+  .lib-lock{display:inline-flex;vertical-align:-2px;margin-left:6px;color:var(--ink-soft);}
+  .lib-lock svg{display:block;}
+  .senha-section{margin-bottom:18px;}
+  .senha-status{font-size:12.5px;color:var(--ink-soft);margin:0 0 8px;line-height:1.5;}
+  .senha-status b{color:var(--ink);}
+  .senha-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .senha-row .lib-modal-input{margin-top:0;flex:1;min-width:160px;width:auto;}
+  .senha-err{font-size:12.5px;color:var(--atrasado);margin:8px 0 0;min-height:0;}
+  .senha-err:empty{display:none;}
+
   /* ---- Reaproveitado do painel original ---- */
   .gauge-card{
     background:var(--surface);border-radius:20px;padding:20px 22px;display:flex;align-items:center;gap:20px;
@@ -859,6 +870,19 @@
   </div>
 </div>
 
+<div class="lib-modal-overlay" id="libSenhaOverlay" style="display:none;">
+  <div class="lib-modal">
+    <div class="lib-modal-title plain">Pasta protegida</div>
+    <p class="lib-modal-text" id="libSenhaTexto"></p>
+    <input type="password" id="libSenhaInput" class="lib-modal-input" placeholder="Senha da pasta" autocomplete="off" maxlength="120">
+    <p class="senha-err" id="libSenhaErro"></p>
+    <div class="lib-modal-actions">
+      <button class="mini-btn" id="libSenhaCancel">Cancelar</button>
+      <button class="mini-btn dark" id="libSenhaConfirm">Entrar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ==========================================================
 // CONFIG — regras de leitura da planilha
@@ -1423,7 +1447,7 @@ function renderBreadcrumb(){
     btn.type = 'button';
     btn.className = 'lib-crumb' + (isCurrent ? ' current' : '');
     btn.textContent = node.nome;
-    btn.addEventListener('click', () => { if(!isCurrent){ currentFolderId = node.id; folderSettingsOpen = false; renderLibrary(); } });
+    btn.addEventListener('click', () => { if(!isCurrent){ irParaPasta(node.id); } });
     addCrumbDropTarget(btn, node.id);
     libBreadcrumb.appendChild(btn);
   });
@@ -1500,10 +1524,408 @@ libNewFolderInput.addEventListener('keydown', (e) => {
 });
 newFolderBtn.addEventListener('click', openNewFolderModal);
 
+// ==========================================================
+// SENHA POR PASTA — criptografia de verdade
+//
+// Ao definir a senha de uma pasta, o painel gera um par de chaves RSA:
+//  - chavePublica: fica aberta em config/pastas. O script SANSYS usa
+//    essa chave para cifrar as OS da pasta antes de gravar no Firestore.
+//  - chavePrivadaCifrada: a chave privada, trancada com a senha
+//    (PBKDF2-SHA256 + AES-GCM). Só quem sabe a senha consegue abrir.
+// Sem a senha, os dados da pasta no Firestore são ilegíveis. Trocar a
+// senha só re-tranca a chave privada: não precisa reenviar a planilha.
+// A senha de uma pasta vale também para as subpastas.
+// ==========================================================
+const KDF_ITER = 200000;
+
+function hexFromBuf(buf){
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+function bufFromHex(hex){
+  const a = new Uint8Array(hex.length / 2);
+  for(let i=0;i<a.length;i++) a[i] = parseInt(hex.substr(i*2,2),16);
+  return a;
+}
+function novoSaltHex(){
+  return hexFromBuf(crypto.getRandomValues(new Uint8Array(16)));
+}
+function b64FromBuf(buf){
+  const a = new Uint8Array(buf);
+  let s = '';
+  for(let i=0;i<a.length;i+=0x8000) s += String.fromCharCode.apply(null, a.subarray(i, i+0x8000));
+  return btoa(s);
+}
+function bufFromB64(b64){
+  const bin = atob(b64);
+  const a = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
+  return a;
+}
+function garantirCrypto(){
+  if(!window.crypto || !crypto.subtle) throw new Error('Este endereço não permite criptografia. Abra o painel por https.');
+}
+async function derivarKek(senha, saltHex){
+  garantirCrypto();
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    {name:'PBKDF2', salt:bufFromHex(saltHex), iterations:KDF_ITER, hash:'SHA-256'},
+    base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
+}
+// Tranca a chave privada (bytes pkcs8) com a senha.
+async function cifrarPrivada(pkcs8Buf, senha){
+  const salt = novoSaltHex();
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const kek = await derivarKek(senha, salt);
+  const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, kek, pkcs8Buf);
+  return { senhaSalt: salt, chavePrivadaCifrada: b64FromBuf(ct), chavePrivadaIv: b64FromBuf(iv) };
+}
+// Destranca a chave privada. Lança OperationError se a senha estiver errada.
+async function decifrarPrivadaBytes(f, senha){
+  const kek = await derivarKek(senha, f.senhaSalt);
+  return crypto.subtle.decrypt({name:'AES-GCM', iv:bufFromB64(f.chavePrivadaIv)}, kek, bufFromB64(f.chavePrivadaCifrada));
+}
+async function abrirChavePrivada(f, senha){
+  const pkcs8 = await decifrarPrivadaBytes(f, senha);
+  return crypto.subtle.importKey('pkcs8', pkcs8, {name:'RSA-OAEP', hash:'SHA-256'}, false, ['decrypt']);
+}
+async function gerarChavesPasta(senha){
+  garantirCrypto();
+  const par = await crypto.subtle.generateKey(
+    {name:'RSA-OAEP', modulusLength:2048, publicExponent:new Uint8Array([1,0,1]), hash:'SHA-256'},
+    true, ['encrypt','decrypt']);
+  const spki = await crypto.subtle.exportKey('spki', par.publicKey);
+  const pkcs8 = await crypto.subtle.exportKey('pkcs8', par.privateKey);
+  const priv = await cifrarPrivada(pkcs8, senha);
+  return { pub: b64FromBuf(spki), senhaSalt: priv.senhaSalt, chavePrivadaCifrada: priv.chavePrivadaCifrada, chavePrivadaIv: priv.chavePrivadaIv };
+}
+
+// ---- Estado em memória (some ao recarregar a página ou sair) ----
+// Lote atual vindo do Firestore: linhas abertas + blocos cifrados por pasta.
+let LOTE = { id: 0, headers: [], plain: [], enc: {} };
+// pastaId -> { key: CryptoKey da chave privada, pub: chavePublica correspondente }
+let chavesPastas = {};
+function limparDesbloqueadas(){
+  chavesPastas = {};
+  LOTE = { id: 0, headers: [], plain: [], enc: {} };
+}
+
+function pastaTemSenha(id){
+  const f = pastas[id];
+  return !!(f && f.chavePublica && f.chavePrivadaCifrada && f.chavePrivadaIv && f.senhaSalt);
+}
+// Se a chave da pasta foi refeita (redefinição), quem tinha liberado precisa digitar de novo.
+function pastaDesbloqueada(id){
+  const f = pastas[id];
+  const c = chavesPastas[id];
+  return !!(f && c && f.chavePublica && c.pub === f.chavePublica);
+}
+// Devolve o id da primeira pasta (da raiz para baixo) que exige senha e ainda não foi liberada.
+// Admin entra em qualquer pasta (para poder configurar), mas só vê os dados depois de digitar a senha.
+function pastaBloqueante(id){
+  if(isAdmin || !id) return null;
+  const chain = [];
+  let cur = id, guard = 0;
+  while(cur && guard < 50){
+    const f = pastas[cur];
+    if(!f) break;
+    chain.unshift(cur);
+    cur = f.parentId || null;
+    guard++;
+  }
+  for(const pid of chain){
+    if(pastaTemSenha(pid) && !pastaDesbloqueada(pid)) return pid;
+  }
+  return null;
+}
+// Pasta protegida mais próxima da raiz na cadeia de id (é ela que cifra os dados).
+function pastaDosDados(id){
+  let cur = id, guard = 0, topo = null;
+  while(cur && guard < 50){
+    const f = pastas[cur];
+    if(!f) break;
+    if(pastaTemSenha(cur)) topo = cur;
+    cur = f.parentId || null;
+    guard++;
+  }
+  return topo;
+}
+function dadosBloqueados(id){
+  const p = pastaDosDados(id);
+  return !!p && !pastaDesbloqueada(p);
+}
+function irParaPasta(id){
+  const bloq = pastaBloqueante(id);
+  if(bloq){ abrirModalSenha(bloq, id); return; }
+  currentFolderId = id;
+  folderSettingsOpen = false;
+  renderLibrary();
+}
+
+// ---- Leitura dos dados cifrados ----
+async function decifrarPastaDoLote(pid){
+  const info = LOTE.enc[pid];
+  if(!info || !chavesPastas[pid]) return [];
+  const rawDek = await crypto.subtle.decrypt({name:'RSA-OAEP'}, chavesPastas[pid].key, bufFromB64(info.meta.chaveDados));
+  const dek = await crypto.subtle.importKey('raw', rawDek, 'AES-GCM', false, ['decrypt']);
+  const docs = info.docs.slice().sort((a,b) => (a.index ?? 0) - (b.index ?? 0));
+  const out = [];
+  for(const d of docs){
+    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:bufFromB64(d.iv)}, dek, bufFromB64(d.dados));
+    const itens = JSON.parse(new TextDecoder().decode(pt));
+    for(const it of itens) out.push(it);
+  }
+  return out;
+}
+// Junta as linhas abertas com as das pastas já liberadas e processa a planilha.
+async function construirDadosBrutos(){
+  const linhas = LOTE.plain.slice();
+  const vistos = new Set();
+  for(const pid of Object.keys(LOTE.enc)){
+    if(!pastaDesbloqueada(pid)) continue;
+    try{
+      const itens = await decifrarPastaDoLote(pid);
+      for(const it of itens){
+        if(vistos.has(it.i)) continue; // a mesma OS pode estar em duas pastas protegidas
+        vistos.add(it.i);
+        linhas.push(it.r);
+      }
+    }catch(e){
+      console.error('Não consegui decifrar os dados da pasta', pid, e);
+    }
+  }
+  if(!linhas.length) return [];
+  return processarPlanilha([LOTE.headers || [], ...linhas]);
+}
+async function recarregarDadosBrutos(){
+  if(!LOTE.id) return;
+  DADOS_BRUTOS = await construirDadosBrutos();
+  computeMatches();
+  renderLibrary();
+}
+
+function lockIconSvg(){
+  return '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+}
+
+// ---- Modal de senha ----
+const libSenhaOverlay = document.getElementById('libSenhaOverlay');
+const libSenhaTexto = document.getElementById('libSenhaTexto');
+const libSenhaInput = document.getElementById('libSenhaInput');
+const libSenhaErro = document.getElementById('libSenhaErro');
+const libSenhaCancel = document.getElementById('libSenhaCancel');
+const libSenhaConfirm = document.getElementById('libSenhaConfirm');
+let senhaAlvoId = null, senhaDestinoId = null;
+
+function abrirModalSenha(alvoId, destinoId){
+  const f = pastas[alvoId];
+  if(!f) return;
+  senhaAlvoId = alvoId;
+  senhaDestinoId = destinoId;
+  libSenhaTexto.innerHTML = 'Digite a senha da pasta <b>' + escapeHtml(f.nome || '') + '</b> para acessar.';
+  libSenhaInput.value = '';
+  libSenhaErro.textContent = '';
+  libSenhaOverlay.style.display = 'flex';
+  setTimeout(() => libSenhaInput.focus(), 0);
+}
+function fecharModalSenha(){
+  libSenhaOverlay.style.display = 'none';
+  libSenhaInput.value = '';
+  senhaAlvoId = null;
+  senhaDestinoId = null;
+}
+async function confirmarSenha(){
+  const alvo = senhaAlvoId;
+  const f = pastas[alvo];
+  const valor = libSenhaInput.value;
+  if(!f){ fecharModalSenha(); return; }
+  if(!valor){ libSenhaInput.focus(); return; }
+  libSenhaConfirm.disabled = true;
+  libSenhaErro.textContent = '';
+  let key;
+  try{
+    key = await abrirChavePrivada(f, valor);
+  }catch(e){
+    libSenhaErro.textContent = (e && e.name === 'OperationError') ? 'Senha incorreta.' : (e.message || 'Não foi possível verificar a senha.');
+    libSenhaInput.select();
+    libSenhaConfirm.disabled = false;
+    return;
+  }
+  chavesPastas[alvo] = { key, pub: f.chavePublica };
+  const destino = senhaDestinoId;
+  fecharModalSenha();
+  libSenhaConfirm.disabled = false;
+  try{
+    await recarregarDadosBrutos();
+  }catch(e){
+    console.error('Erro ao abrir os dados da pasta:', e);
+    mostrarCopyToast('Erro ao abrir os dados da pasta');
+  }
+  irParaPasta(destino); // se houver outra pasta com senha no caminho, pede a próxima
+}
+libSenhaCancel.addEventListener('click', fecharModalSenha);
+libSenhaOverlay.addEventListener('click', (e) => { if(e.target === libSenhaOverlay) fecharModalSenha(); });
+libSenhaConfirm.addEventListener('click', confirmarSenha);
+libSenhaInput.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); confirmarSenha(); }
+  if(e.key === 'Escape'){ e.preventDefault(); fecharModalSenha(); }
+});
+
+// ---- Configuração da senha (só admin, dentro da engrenagem da pasta) ----
+async function definirNovasChaves(folderId, senha){
+  const f = pastas[folderId];
+  const k = await gerarChavesPasta(senha);
+  f.chavePublica = k.pub;
+  f.senhaSalt = k.senhaSalt;
+  f.chavePrivadaCifrada = k.chavePrivadaCifrada;
+  f.chavePrivadaIv = k.chavePrivadaIv;
+  delete f.senhaHash; // senha antiga (só de tela), não é mais usada
+  chavesPastas[folderId] = { key: await abrirChavePrivada(f, senha), pub: f.chavePublica };
+}
+
+function renderSenhaSection(folderId){
+  const f = pastas[folderId];
+  const wrap = document.createElement('div');
+  wrap.className = 'crit-section senha-section';
+
+  const h = document.createElement('div');
+  h.className = 'crit-heading';
+  h.textContent = 'Senha da pasta';
+  wrap.appendChild(h);
+
+  const tem = pastaTemSenha(folderId);
+  const status = document.createElement('p');
+  status.className = 'senha-status';
+  if(tem){
+    status.innerHTML = '<b>Protegida por senha.</b> Os dados desta pasta ficam cifrados no Firestore a partir do próximo envio da planilha pelo script SANSYS. A senha vale também para as subpastas.';
+  } else if(f.senhaHash){
+    status.textContent = 'Esta pasta tinha uma senha antiga, só de tela, que não é mais usada. Defina a senha de novo para proteger os dados.';
+  } else {
+    status.textContent = 'Sem senha. Ao definir uma, as OS desta pasta passam a ser cifradas no próximo envio da planilha pelo script SANSYS.';
+  }
+  wrap.appendChild(status);
+
+  const mkInput = (ph, ac) => {
+    const i = document.createElement('input');
+    i.type = 'password';
+    i.className = 'lib-modal-input';
+    i.placeholder = ph;
+    i.autocomplete = ac;
+    i.maxLength = 120;
+    return i;
+  };
+
+  let atual = null;
+  if(tem){
+    const r0 = document.createElement('div');
+    r0.className = 'senha-row';
+    r0.style.marginBottom = '8px';
+    atual = mkInput('Senha atual', 'current-password');
+    r0.appendChild(atual);
+    wrap.appendChild(r0);
+  }
+
+  const row = document.createElement('div');
+  row.className = 'senha-row';
+  const nova = mkInput(tem ? 'Nova senha (mín. 4 caracteres)' : 'Senha (mín. 4 caracteres)', 'new-password');
+  row.appendChild(nova);
+
+  const salvar = document.createElement('button');
+  salvar.type = 'button';
+  salvar.className = 'mini-btn dark';
+  salvar.textContent = tem ? 'Alterar senha' : 'Definir senha';
+  row.appendChild(salvar);
+
+  let redefinir = null, remover = null;
+  if(tem){
+    redefinir = document.createElement('button');
+    redefinir.type = 'button';
+    redefinir.className = 'mini-btn';
+    redefinir.textContent = 'Esqueci a atual';
+    redefinir.title = 'Gera chaves novas com a senha digitada em "Nova senha". Os dados já cifrados ficam ilegíveis até o próximo envio da planilha.';
+    row.appendChild(redefinir);
+
+    remover = document.createElement('button');
+    remover.type = 'button';
+    remover.className = 'mini-btn danger';
+    remover.textContent = 'Remover senha';
+    row.appendChild(remover);
+  }
+  wrap.appendChild(row);
+
+  const err = document.createElement('p');
+  err.className = 'senha-err';
+  wrap.appendChild(err);
+
+  const botoes = [salvar, redefinir, remover].filter(Boolean);
+  const ocupar = (v, txt) => { botoes.forEach(b => b.disabled = v); if(txt) err.textContent = txt; };
+  const checarNova = () => {
+    if(nova.value.length < 4){ err.textContent = 'Use pelo menos 4 caracteres na nova senha.'; nova.focus(); return false; }
+    return true;
+  };
+  const concluir = (msg) => {
+    savePastas();
+    renderFolderDetail();
+    renderLibGrid();
+    mostrarCopyToast(msg);
+  };
+
+  const acaoSalvar = async () => {
+    err.textContent = '';
+    if(!checarNova()) return;
+    ocupar(true);
+    try{
+      if(!tem){
+        err.textContent = 'Gerando chaves...';
+        await definirNovasChaves(folderId, nova.value);
+        concluir('Senha definida');
+      } else {
+        if(!atual.value){ err.textContent = 'Digite a senha atual.'; atual.focus(); ocupar(false); return; }
+        let pkcs8;
+        try{ pkcs8 = await decifrarPrivadaBytes(f, atual.value); }
+        catch(e){ err.textContent = 'Senha atual incorreta.'; atual.select(); ocupar(false); return; }
+        Object.assign(f, await cifrarPrivada(pkcs8, nova.value));
+        concluir('Senha alterada');
+      }
+    }catch(e){
+      err.textContent = e.message || 'Não foi possível salvar a senha.';
+      ocupar(false);
+    }
+  };
+  salvar.addEventListener('click', acaoSalvar);
+  nova.addEventListener('keydown', (e) => { if(e.key === 'Enter'){ e.preventDefault(); acaoSalvar(); } });
+
+  if(redefinir){
+    redefinir.addEventListener('click', async () => {
+      err.textContent = '';
+      if(!checarNova()) return;
+      if(!window.confirm('Redefinir gera chaves novas. Os dados desta pasta que já estão cifrados no Firestore ficam ilegíveis até o próximo envio da planilha. Continuar?')) return;
+      ocupar(true, 'Gerando chaves...');
+      try{
+        await definirNovasChaves(folderId, nova.value);
+        concluir('Senha redefinida');
+        await recarregarDadosBrutos();
+      }catch(e){
+        err.textContent = e.message || 'Não foi possível redefinir a senha.';
+        ocupar(false);
+      }
+    });
+    remover.addEventListener('click', async () => {
+      if(!window.confirm('Remover a senha? Os dados desta pasta que já estão cifrados no Firestore só voltam a aparecer no próximo envio da planilha.')) return;
+      ['chavePublica','senhaSalt','chavePrivadaCifrada','chavePrivadaIv','senhaHash'].forEach(k => { delete f[k]; });
+      delete chavesPastas[folderId];
+      concluir('Senha removida');
+      try{ await recarregarDadosBrutos(); }catch(e){ console.error(e); }
+    });
+  }
+
+  return wrap;
+}
+
 function buildLibCard(id){
   const f = pastas[id];
   const childCount = folderChildren(id).length;
   const leaf = childCount === 0;
+  const bloqueada = pastaTemSenha(id) && !pastaDesbloqueada(id);
   const card = document.createElement('div');
   card.className = 'lib-card';
   card.dataset.id = id;
@@ -1517,12 +1939,25 @@ function buildLibCard(id){
   const nameEl = document.createElement('span');
   nameEl.className = 'lib-card-name';
   nameEl.textContent = f.nome || '(sem nome)';
+  if(pastaTemSenha(id)){
+    const lk = document.createElement('span');
+    lk.className = 'lib-lock';
+    lk.title = 'Pasta com senha';
+    lk.innerHTML = lockIconSvg();
+    nameEl.appendChild(lk);
+  }
   info.appendChild(nameEl);
 
   const meta = document.createElement('div');
   // Pastas com subpastas nunca mostram contagem de OS aqui — só a pasta-folha
   // específica (a que tem os critérios) mostra suas próprias OS.
-  if(!leaf){
+  if(bloqueada){
+    meta.className = 'lib-card-meta';
+    meta.textContent = 'Protegida por senha';
+  } else if(dadosBloqueados(id)){
+    meta.className = 'lib-card-meta';
+    meta.textContent = 'Dados bloqueados';
+  } else if(!leaf){
     meta.className = 'lib-card-meta';
     meta.textContent = childCount + (childCount === 1 ? ' subpasta' : ' subpastas');
   } else {
@@ -1586,9 +2021,7 @@ function buildLibCard(id){
 
   card.addEventListener('click', (e) => {
     if(e.target.closest('input') || e.target.closest('.lib-card-actions')) return;
-    currentFolderId = id;
-    folderSettingsOpen = false;
-    renderLibrary();
+    irParaPasta(id);
   });
 
   return card;
@@ -2002,11 +2435,31 @@ function renderFolderDetail(){
   }
   folderDetail.appendChild(countEl);
 
+  // Admin entra em qualquer pasta, mas só vê as OS depois de digitar a senha.
+  if(isAdmin && dadosBloqueados(currentFolderId)){
+    const alvoSenha = pastaDosDados(currentFolderId);
+    const aviso = document.createElement('div');
+    aviso.className = 'senha-section';
+    aviso.style.marginTop = '12px';
+    const txt = document.createElement('p');
+    txt.className = 'senha-status';
+    txt.textContent = 'As OS protegidas desta pasta estão bloqueadas nesta sessão. Digite a senha para vê-las.';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mini-btn dark';
+    btn.textContent = 'Inserir senha para ver os dados';
+    btn.addEventListener('click', () => abrirModalSenha(alvoSenha, currentFolderId));
+    aviso.appendChild(txt);
+    aviso.appendChild(btn);
+    folderDetail.appendChild(aviso);
+  }
+
   // Critérios só aparecem quando a engrenagem é aberta (só para admin).
   if(!isAdmin || !folderSettingsOpen) return;
 
   const block = document.createElement('div');
   block.className = 'crit-block';
+  block.appendChild(renderSenhaSection(currentFolderId));
   // Se esta pasta ainda não tem cidades próprias mas tem uma pasta-mãe com
   // cidades configuradas, oferece um botão para copiar de uma vez (cobre o
   // caso de pastas criadas antes desse recurso existir).
@@ -2053,6 +2506,8 @@ function renderFolderDetail(){
 }
 
 function renderLibrary(){
+  // Se a pasta aberta passou a exigir senha (ex.: admin acabou de definir), volta para a raiz.
+  if(currentFolderId && pastaBloqueante(currentFolderId)){ currentFolderId = null; folderSettingsOpen = false; }
   newFolderBtn.style.display = isAdmin ? 'inline-flex' : 'none';
   renderBreadcrumb();
   renderLibGrid();
@@ -2090,6 +2545,7 @@ function nomeCompletoPasta(id){
 }
 
 function abrirPasta(folderId){
+  if(pastaBloqueante(folderId)){ irParaPasta(folderId); return; }
   pastaAbertaId = folderId;
   DADOS = collectMatchesRecursive(folderId).slice();
   statusAtivo = null;
@@ -2737,7 +3193,18 @@ function toggleCard(i){
   async function carregarPlanilhaDoFirestore(meta){
     const snap = await db.collection(ROWS_COLLECTION).get();
     const blocos = [];
-    snap.forEach(doc => blocos.push(doc.data()));
+    const enc = {};
+    const encMeta = (meta && meta.enc) || {};
+    snap.forEach(doc => {
+      const d = doc.data();
+      if(d && d.enc === true && d.pastaId){
+        if(!encMeta[d.pastaId]) return; // bloco órfão (sem chave no meta)
+        if(!enc[d.pastaId]) enc[d.pastaId] = { meta: encMeta[d.pastaId], docs: [] };
+        enc[d.pastaId].docs.push(d);
+      } else {
+        blocos.push(d);
+      }
+    });
     blocos.sort((a,b) => (a.index ?? 0) - (b.index ?? 0));
 
     let linhasDados = [];
@@ -2750,8 +3217,8 @@ function toggleCard(i){
       }
     });
 
-    const rows = [meta.headers || [], ...linhasDados];
-    return processarPlanilha(rows);
+    LOTE = { id: LOTE.id + 1, headers: (meta && meta.headers) || [], plain: linhasDados, enc };
+    return construirDadosBrutos();
   }
 
   function iniciarSincronizacaoPlanilha(){
@@ -2796,6 +3263,7 @@ function toggleCard(i){
       if(unsubscribePastas){ unsubscribePastas(); unsubscribePastas = null; }
       if(unsubscribePlanilha){ unsubscribePlanilha(); unsubscribePlanilha = null; }
       isAdmin = false;
+      limparDesbloqueadas();
       appShell.style.display = 'none';
       loginScreen.style.display = 'flex';
       loginForm.reset();
