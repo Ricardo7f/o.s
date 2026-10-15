@@ -1311,9 +1311,12 @@ function updateStatusBar(){
   const dot = document.getElementById('statusDot');
   const text = document.getElementById('statusText');
   const btnLimpar = document.getElementById('btnLimpar');
+  const avisoFalha = (typeof falhasDecifragem !== 'undefined' && falhasDecifragem.length)
+    ? '<span class="status-sep"></span><span class="status-seg" style="color:#b42318"><b>Aviso:</b> ' + escapeHtml(falhasDecifragem[0]) + (falhasDecifragem.length > 1 ? ' (+' + (falhasDecifragem.length - 1) + ')' : '') + '</span>'
+    : '';
   if(!DADOS_BRUTOS.length){
     dot.className = 'status-dot';
-    text.innerHTML = '<span class="status-seg">Nenhuma planilha enviada ainda. Crie suas pastas e depois envie o arquivo.</span>';
+    text.innerHTML = '<span class="status-seg">' + (avisoFalha ? 'Nenhum dado pôde ser exibido.' : 'Nenhuma planilha enviada ainda. Crie suas pastas e depois envie o arquivo.') + '</span>' + avisoFalha;
     btnLimpar.style.display = 'none';
     return;
   }
@@ -1325,6 +1328,7 @@ function updateStatusBar(){
     <span class="status-sep"></span>
     <span class="status-seg"><b>${roteadas.toLocaleString('pt-BR')}</b>distribuídas nas pastas</span>
     ${hora ? `<span class="status-sep"></span><span class="status-seg">Atualizado às ${hora}</span>` : ''}
+    ${avisoFalha}
   `;
   btnLimpar.style.display = isAdmin ? 'inline-block' : 'none';
 }
@@ -1536,7 +1540,10 @@ newFolderBtn.addEventListener('click', openNewFolderModal);
 // senha só re-tranca a chave privada: não precisa reenviar a planilha.
 // A senha de uma pasta vale também para as subpastas.
 // ==========================================================
-const KDF_ITER = 200000;
+const KDF_ITER = 600000;         // senhas novas (OWASP: PBKDF2-SHA256 >= 600 mil)
+const KDF_ITER_LEGADO = 200000;  // pastas criadas antes de guardarmos senhaIter
+const KDF_ITER_MAX = 2000000;    // teto: um valor absurdo no Firestore não pode travar o navegador
+const SENHA_MIN = 10;
 
 function hexFromBuf(buf){
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
@@ -1564,24 +1571,26 @@ function bufFromB64(b64){
 function garantirCrypto(){
   if(!window.crypto || !crypto.subtle) throw new Error('Este endereço não permite criptografia. Abra o painel por https.');
 }
-async function derivarKek(senha, saltHex){
+async function derivarKek(senha, saltHex, iter){
   garantirCrypto();
+  let it = Number(iter) || KDF_ITER_LEGADO;
+  it = Math.min(Math.max(Math.floor(it), 1000), KDF_ITER_MAX);
   const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(senha), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    {name:'PBKDF2', salt:bufFromHex(saltHex), iterations:KDF_ITER, hash:'SHA-256'},
+    {name:'PBKDF2', salt:bufFromHex(saltHex), iterations:it, hash:'SHA-256'},
     base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']);
 }
 // Tranca a chave privada (bytes pkcs8) com a senha.
 async function cifrarPrivada(pkcs8Buf, senha){
   const salt = novoSaltHex();
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const kek = await derivarKek(senha, salt);
+  const kek = await derivarKek(senha, salt, KDF_ITER);
   const ct = await crypto.subtle.encrypt({name:'AES-GCM', iv}, kek, pkcs8Buf);
-  return { senhaSalt: salt, chavePrivadaCifrada: b64FromBuf(ct), chavePrivadaIv: b64FromBuf(iv) };
+  return { senhaSalt: salt, senhaIter: KDF_ITER, chavePrivadaCifrada: b64FromBuf(ct), chavePrivadaIv: b64FromBuf(iv) };
 }
 // Destranca a chave privada. Lança OperationError se a senha estiver errada.
 async function decifrarPrivadaBytes(f, senha){
-  const kek = await derivarKek(senha, f.senhaSalt);
+  const kek = await derivarKek(senha, f.senhaSalt, f.senhaIter);
   return crypto.subtle.decrypt({name:'AES-GCM', iv:bufFromB64(f.chavePrivadaIv)}, kek, bufFromB64(f.chavePrivadaCifrada));
 }
 async function abrirChavePrivada(f, senha){
@@ -1596,17 +1605,19 @@ async function gerarChavesPasta(senha){
   const spki = await crypto.subtle.exportKey('spki', par.publicKey);
   const pkcs8 = await crypto.subtle.exportKey('pkcs8', par.privateKey);
   const priv = await cifrarPrivada(pkcs8, senha);
-  return { pub: b64FromBuf(spki), senhaSalt: priv.senhaSalt, chavePrivadaCifrada: priv.chavePrivadaCifrada, chavePrivadaIv: priv.chavePrivadaIv };
+  return { pub: b64FromBuf(spki), senhaSalt: priv.senhaSalt, senhaIter: priv.senhaIter, chavePrivadaCifrada: priv.chavePrivadaCifrada, chavePrivadaIv: priv.chavePrivadaIv };
 }
 
 // ---- Estado em memória (some ao recarregar a página ou sair) ----
 // Lote atual vindo do Firestore: linhas abertas + blocos cifrados por pasta.
-let LOTE = { id: 0, headers: [], plain: [], enc: {} };
+let LOTE = { id: 0, headers: [], plain: [], enc: {}, avisos: [] };
 // pastaId -> { key: CryptoKey da chave privada, pub: chavePublica correspondente }
 let chavesPastas = {};
 function limparDesbloqueadas(){
   chavesPastas = {};
-  LOTE = { id: 0, headers: [], plain: [], enc: {} };
+  LOTE = { id: 0, headers: [], plain: [], enc: {}, avisos: [] };
+  falhasDecifragem = [];
+  ultimoAvisoFalhas = '';
 }
 
 function pastaTemSenha(id){
@@ -1662,15 +1673,52 @@ function irParaPasta(id){
 }
 
 // ---- Leitura dos dados cifrados ----
+// Avisos que ficam visíveis (barra de status + aviso rápido) quando alguma
+// parte dos dados não pôde ser lida, em vez de falhar só no console.
+let falhasDecifragem = [];
+let ultimoAvisoFalhas = '';
+function avisarFalhasDecifragem(falhas){
+  falhasDecifragem = falhas.slice();
+  const chave = falhasDecifragem.join('|');
+  if(chave && chave !== ultimoAvisoFalhas){
+    mostrarCopyToast('Atenção: ' + falhasDecifragem[0] + (falhasDecifragem.length > 1 ? ' (+' + (falhasDecifragem.length - 1) + ')' : ''), 7000);
+  }
+  ultimoAvisoFalhas = chave;
+  try{ updateStatusBar(); }catch(e){ /* a barra pode não existir ainda */ }
+}
+// AAD: amarra cada bloco à pasta, à posição e ao total de blocos. Assim ninguém
+// consegue trocar a ordem, duplicar ou tirar blocos sem o AES-GCM acusar.
+function aadDoBloco(pid, index, total){
+  return new TextEncoder().encode(pid + '|' + index + '|' + total);
+}
 async function decifrarPastaDoLote(pid){
   const info = LOTE.enc[pid];
   if(!info || !chavesPastas[pid]) return [];
-  const rawDek = await crypto.subtle.decrypt({name:'RSA-OAEP'}, chavesPastas[pid].key, bufFromB64(info.meta.chaveDados));
-  const dek = await crypto.subtle.importKey('raw', rawDek, 'AES-GCM', false, ['decrypt']);
+  const total = info.meta.totalChunks;
   const docs = info.docs.slice().sort((a,b) => (a.index ?? 0) - (b.index ?? 0));
+  // Integridade: precisa ter exatamente os blocos 0..total-1, sem faltar nem sobrar.
+  if(Number.isInteger(total)){
+    const completo = docs.length === total && docs.every((d, i) => d.index === i);
+    if(!completo) throw new Error('dados incompletos (' + docs.length + ' de ' + total + ' blocos)');
+  }
+  const usaAad = info.meta.aad === 1;
+  let rawDek;
+  try{
+    rawDek = await crypto.subtle.decrypt({name:'RSA-OAEP'}, chavesPastas[pid].key, bufFromB64(info.meta.chaveDados));
+  }catch(e){
+    throw new Error('a chave desta pasta não confere com os dados enviados (senha redefinida? aguarde o próximo envio da planilha)');
+  }
+  const dek = await crypto.subtle.importKey('raw', rawDek, 'AES-GCM', false, ['decrypt']);
   const out = [];
   for(const d of docs){
-    const pt = await crypto.subtle.decrypt({name:'AES-GCM', iv:bufFromB64(d.iv)}, dek, bufFromB64(d.dados));
+    const params = { name:'AES-GCM', iv: bufFromB64(d.iv) };
+    if(usaAad) params.additionalData = aadDoBloco(pid, d.index, total);
+    let pt;
+    try{
+      pt = await crypto.subtle.decrypt(params, dek, bufFromB64(d.dados));
+    }catch(e){
+      throw new Error('o bloco ' + d.index + ' não passou na verificação de integridade');
+    }
     const itens = JSON.parse(new TextDecoder().decode(pt));
     for(const it of itens) out.push(it);
   }
@@ -1680,6 +1728,7 @@ async function decifrarPastaDoLote(pid){
 async function construirDadosBrutos(){
   const linhas = LOTE.plain.slice();
   const vistos = new Set();
+  const falhas = (LOTE.avisos || []).slice();
   for(const pid of Object.keys(LOTE.enc)){
     if(!pastaDesbloqueada(pid)) continue;
     try{
@@ -1691,8 +1740,11 @@ async function construirDadosBrutos(){
       }
     }catch(e){
       console.error('Não consegui decifrar os dados da pasta', pid, e);
+      const nome = (pastas[pid] && pastas[pid].nome) || pid;
+      falhas.push('pasta "' + nome + '": ' + (e && e.message ? e.message : 'erro ao decifrar'));
     }
   }
+  avisarFalhasDecifragem(falhas);
   if(!linhas.length) return [];
   return processarPlanilha([LOTE.headers || [], ...linhas]);
 }
@@ -1776,6 +1828,7 @@ async function definirNovasChaves(folderId, senha){
   const k = await gerarChavesPasta(senha);
   f.chavePublica = k.pub;
   f.senhaSalt = k.senhaSalt;
+  f.senhaIter = k.senhaIter;
   f.chavePrivadaCifrada = k.chavePrivadaCifrada;
   f.chavePrivadaIv = k.chavePrivadaIv;
   delete f.senhaHash; // senha antiga (só de tela), não é mais usada
@@ -1796,7 +1849,10 @@ function renderSenhaSection(folderId){
   const status = document.createElement('p');
   status.className = 'senha-status';
   if(tem){
-    status.innerHTML = '<b>Protegida por senha.</b> Os dados desta pasta ficam cifrados no Firestore a partir do próximo envio da planilha pelo script SANSYS. A senha vale também para as subpastas.';
+    status.innerHTML = '<b>Protegida por senha.</b> Os dados desta pasta ficam cifrados no Firestore a partir do próximo envio da planilha pelo script SANSYS. A senha vale também para as subpastas. '
+      + 'Atenção: os dados são cifrados com a chave da pasta protegida mais próxima da raiz; se a pasta-mãe também tiver senha, quem sabe a senha dela lê os dados das subpastas (a senha da subpasta vira só uma trava de tela). '
+      + 'OS que também caem em alguma pasta sem senha continuam abertas no Firestore.'
+      + ((!f.senhaIter || f.senhaIter < KDF_ITER) ? ' <b>Proteção da senha em formato antigo: use "Alterar senha" (com uma senha de ' + SENHA_MIN + '+ caracteres) para reforçar.</b>' : '');
   } else if(f.senhaHash){
     status.textContent = 'Esta pasta tinha uma senha antiga, só de tela, que não é mais usada. Defina a senha de novo para proteger os dados.';
   } else {
@@ -1826,7 +1882,7 @@ function renderSenhaSection(folderId){
 
   const row = document.createElement('div');
   row.className = 'senha-row';
-  const nova = mkInput(tem ? 'Nova senha (mín. 4 caracteres)' : 'Senha (mín. 4 caracteres)', 'new-password');
+  const nova = mkInput(tem ? 'Nova senha (mín. ' + SENHA_MIN + ' caracteres)' : 'Senha (mín. ' + SENHA_MIN + ' caracteres)', 'new-password');
   row.appendChild(nova);
 
   const salvar = document.createElement('button');
@@ -1859,7 +1915,8 @@ function renderSenhaSection(folderId){
   const botoes = [salvar, redefinir, remover].filter(Boolean);
   const ocupar = (v, txt) => { botoes.forEach(b => b.disabled = v); if(txt) err.textContent = txt; };
   const checarNova = () => {
-    if(nova.value.length < 4){ err.textContent = 'Use pelo menos 4 caracteres na nova senha.'; nova.focus(); return false; }
+    if(nova.value.length < SENHA_MIN){ err.textContent = 'Use pelo menos ' + SENHA_MIN + ' caracteres na nova senha (de preferência uma frase).'; nova.focus(); return false; }
+    if(new Set(nova.value).size < 4){ err.textContent = 'Essa senha é muito repetitiva. Use caracteres variados.'; nova.focus(); return false; }
     return true;
   };
   const concluir = (msg) => {
@@ -1911,7 +1968,7 @@ function renderSenhaSection(folderId){
     });
     remover.addEventListener('click', async () => {
       if(!window.confirm('Remover a senha? Os dados desta pasta que já estão cifrados no Firestore só voltam a aparecer no próximo envio da planilha.')) return;
-      ['chavePublica','senhaSalt','chavePrivadaCifrada','chavePrivadaIv','senhaHash'].forEach(k => { delete f[k]; });
+      ['chavePublica','senhaSalt','senhaIter','chavePrivadaCifrada','chavePrivadaIv','senhaHash'].forEach(k => { delete f[k]; });
       delete chavesPastas[folderId];
       concluir('Senha removida');
       try{ await recarregarDadosBrutos(); }catch(e){ console.error(e); }
@@ -2321,7 +2378,7 @@ function renderPalavraChaveBuscaSection(folderId){
       const info = document.createElement('p');
       info.className = 'crit-count';
       info.style.marginTop = '10px';
-      info.innerHTML = '<b>' + kwSearchState.results.length + '</b> serviço(s) diferente(s) encontrados para "' + kwSearchState.query + '". Marque os que quer adicionar a esta pasta:';
+      info.innerHTML = '<b>' + kwSearchState.results.length + '</b> serviço(s) diferente(s) encontrados para "' + escapeHtml(kwSearchState.query) + '". Marque os que quer adicionar a esta pasta:';
       resultsWrap.appendChild(info);
 
       const list = document.createElement('div');
@@ -2634,7 +2691,7 @@ function renderListaServicos(){
     // Segmentos da barra empilhada = proporção exata de cada situação no total.
     const seg = n => total ? (n/total*100).toFixed(2) : 0;
     html += `
-      <div class="servico-card ${temAtraso?'tem-atraso':''}" onclick="abrirServico('${nome.replace(/'/g,"\\'")}')">
+      <div class="servico-card ${temAtraso?'tem-atraso':''}" data-servico="${escapeHtml(nome)}">
         <div class="servico-top">
           <div class="servico-info">
             <div class="servico-nome">${escapeHtml(nome)}</div>
@@ -2661,6 +2718,9 @@ function renderListaServicos(){
   });
 
   cont.innerHTML = html || '<div class="empty">Nenhum serviço encontrado.</div>';
+  cont.querySelectorAll('.servico-card[data-servico]').forEach(el => {
+    el.addEventListener('click', () => abrirServico(el.dataset.servico));
+  });
 }
 document.getElementById('buscaServico').addEventListener('input', renderListaServicos);
 
@@ -2854,12 +2914,12 @@ function copiarTextoFallback(texto){
 }
 
 let copyToastTimer = null;
-function mostrarCopyToast(msg){
+function mostrarCopyToast(msg, ms){
   const t = document.getElementById('copyToast');
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(copyToastTimer);
-  copyToastTimer = setTimeout(()=> t.classList.remove('show'), 2200);
+  copyToastTimer = setTimeout(()=> t.classList.remove('show'), ms || 2200);
 }
 
 const copyOsOverlay = document.getElementById('copyOsOverlay');
@@ -3190,22 +3250,51 @@ function toggleCard(i){
   const ROWS_COLLECTION = 'ope0002_rows';
   const META_DOC_REF = db.collection('ope0002_meta').doc('current');
 
-  async function carregarPlanilhaDoFirestore(meta){
+  // Lê a coleção inteira e agrupa em blocos abertos + blocos cifrados por pasta.
+  async function lerBlocosDoFirestore(meta){
     const snap = await db.collection(ROWS_COLLECTION).get();
     const blocos = [];
     const enc = {};
     const encMeta = (meta && meta.enc) || {};
+    Object.keys(encMeta).forEach(pid => { enc[pid] = { meta: encMeta[pid], docs: [] }; });
     snap.forEach(doc => {
       const d = doc.data();
       if(d && d.enc === true && d.pastaId){
         if(!encMeta[d.pastaId]) return; // bloco órfão (sem chave no meta)
-        if(!enc[d.pastaId]) enc[d.pastaId] = { meta: encMeta[d.pastaId], docs: [] };
         enc[d.pastaId].docs.push(d);
       } else {
         blocos.push(d);
       }
     });
     blocos.sort((a,b) => (a.index ?? 0) - (b.index ?? 0));
+    return { blocos, enc };
+  }
+  // Confere se chegaram todos os blocos que o meta promete (um envio em andamento
+  // pode apagar/regravar blocos enquanto o painel lê).
+  function lerCompleto(meta, blocos, enc){
+    const problemas = [];
+    if(Number.isInteger(meta && meta.totalChunks) && blocos.length !== meta.totalChunks){
+      problemas.push('planilha aberta incompleta (' + blocos.length + ' de ' + meta.totalChunks + ' blocos)');
+    }
+    Object.keys(enc).forEach(pid => {
+      const t = enc[pid].meta && enc[pid].meta.totalChunks;
+      if(Number.isInteger(t) && enc[pid].docs.length !== t){
+        problemas.push('pasta "' + ((pastas[pid] && pastas[pid].nome) || pid) + '": dados incompletos (' + enc[pid].docs.length + ' de ' + t + ' blocos)');
+      }
+    });
+    return problemas;
+  }
+
+  async function carregarPlanilhaDoFirestore(meta){
+    let lido = await lerBlocosDoFirestore(meta);
+    let problemas = lerCompleto(meta, lido.blocos, lido.enc);
+    // Pode ser um envio ainda em andamento: espera um pouco e lê de novo.
+    for(let t = 0; t < 4 && problemas.length; t++){
+      await new Promise(r => setTimeout(r, 1500));
+      lido = await lerBlocosDoFirestore(meta);
+      problemas = lerCompleto(meta, lido.blocos, lido.enc);
+    }
+    const { blocos, enc } = lido;
 
     let linhasDados = [];
     blocos.forEach(b => {
@@ -3214,10 +3303,11 @@ function toggleCard(i){
         linhasDados = linhasDados.concat(linhas);
       }catch(e){
         console.error('Erro ao ler um bloco da planilha:', e);
+        problemas.push('um bloco da planilha aberta está corrompido');
       }
     });
 
-    LOTE = { id: LOTE.id + 1, headers: (meta && meta.headers) || [], plain: linhasDados, enc };
+    LOTE = { id: LOTE.id + 1, headers: (meta && meta.headers) || [], plain: linhasDados, enc, avisos: problemas };
     return construirDadosBrutos();
   }
 
